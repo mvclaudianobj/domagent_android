@@ -474,12 +474,14 @@ class UDP extends DNSServer {
                 }
                 try {
                     socket.receive(response);
-                    if (isTruncatedResponse(response)) {
-                        tcpFallback = true;
-                        doTcpFallback(request, response);
-                    }
-                    checkResizeNeed(response);
-                    return;
+                    if (response.getSocketAddress().equals(address)) {
+                        if (isTruncatedResponse(response)) {
+                            tcpFallback = true;
+                            doTcpFallback(request, response);
+                        }
+                        checkResizeNeed(response);
+                        return;
+                    } else Logger.getLogger().logLine("Unsolicited DNS Response - skipping!");
                 } catch (IOException eio) {
 
                     if (tcpFallback)
