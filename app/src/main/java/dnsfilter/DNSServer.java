@@ -473,7 +473,13 @@ class UDP extends DNSServer {
                     throw new IOException("Cannot reach " + address + "!" + eio.getMessage());
                 }
                 try {
-                    socket.receive(response);
+                    boolean valid = false;
+                    while (!valid) {
+                        socket.receive(response);
+                        valid = response.getSocketAddress().equals(address);
+                        if (!valid)
+                            Logger.getLogger().logLine("Unsolicited DNS Response - skipping!");
+                    }
                     if (isTruncatedResponse(response)) {
                         tcpFallback = true;
                         doTcpFallback(request, response);
