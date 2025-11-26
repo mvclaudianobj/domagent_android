@@ -1,5 +1,5 @@
 /*
- PersonalDNSFilter 1.5
+ DomCustosAgent 1.5
  Copyright (C) 2017 Ingo Zenz
 
  This program is free software; you can redistribute it and/or
@@ -16,7 +16,7 @@
  along with this program; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
- Find the latest version at http://www.zenz-solutions.de/personaldnsfilter
+ Find the latest version at http://www.zenz-solutions.de/DomCustosAgent
  Contact:i.z@gmx.net
  */
 
@@ -572,7 +572,7 @@ public class DNSFilterService extends VpnService  {
 
 		Builder builder = new Builder();
 
-		builder.setSession("personalDNSFilter");
+		builder.setSession("DomCustosAgent");
 
 		if (supportsIPVersion(4))
 			builder.addAddress(ADDRESS_IPV4, 24).addDnsServer(VIRTUALDNS_IPV4).addRoute(VIRTUALDNS_IPV4, 32);

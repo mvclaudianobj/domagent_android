@@ -1,5 +1,5 @@
 /*
- PersonalDNSFilter 1.5
+ DomCustosAgent 1.5
  Copyright (C) 2017 Ingo Zenz
 
  This program is free software; you can redistribute it and/or
@@ -16,7 +16,7 @@
  along with this program; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
- Find the latest version at http://www.zenz-solutions.de/personaldnsfilter
+ Find the latest version at http://www.zenz-solutions.de/DomCustosAgent
  Contact:i.z@gmx.net 
  */
 
@@ -316,7 +316,7 @@ public class DNSProxyActivity extends Activity
 			} catch (IOException e){
 				addToLogView(e.toString()+"\n");
 			}
-			setTitle("personalDNSfilter V" + version + " (Connections:" + connCnt + ")");
+			setTitle("DomCustosAgent V" + version + " (Connections:" + connCnt + ")");
 			dnsField.setText(lastDNS);
 		}
 	}
@@ -369,7 +369,7 @@ public class DNSProxyActivity extends Activity
 			if (logTxt != null)
 				logOutView.setText(logTxt);
 			else
-				logOutView.setText(fromHtml("<strong><em>****This is personalDNSfilter V+" + DNSFilterManager.VERSION + "****</em></strong><br><br>"));
+				logOutView.setText(fromHtml("<strong><em>****This is DomCustosAgent V+" + DNSFilterManager.VERSION + "****</em></strong><br><br>"));
 
 			logOutView.setKeyListener(null);
 			logOutView.setCustomSelectionActionModeCallback(this);
@@ -386,7 +386,7 @@ public class DNSProxyActivity extends Activity
 			} catch (IOException e) {
 				addToLogView(e.toString() + "\n");
 			}
-			setTitle("personalDNSfilter V" + version + " (Connections:" + connCnt + ")");
+			setTitle("DomCustosAgent V" + version + " (Connections:" + connCnt + ")");
 
 			ConfigUtil.HostFilterList[] cfgEntries = null;
 			String filterCategory = null;
@@ -798,7 +798,7 @@ public class DNSProxyActivity extends Activity
 			additionalHostsField.setText(new String(content));
 			additionalHostsChanged = false;
 		} catch (IOException eio) {
-			Logger.getLogger().logLine("Can not load /PersonalDNSFilter/additionalHosts.txt!\n" + eio.toString());
+			Logger.getLogger().logLine("Can not load /DomCustosAgent/additionalHosts.txt!\n" + eio.toString());
 		}
 	}
 
@@ -808,7 +808,7 @@ public class DNSProxyActivity extends Activity
 			manuallyEditField.setText(new String(content));
 			manuallyConfEdited = false;
 		} catch (IOException eio) {
-			Logger.getLogger().logLine("Can not load /PersonalDNSFilter/dnsfilter.conf!\n" + eio.toString());
+			Logger.getLogger().logLine("Can not load /DomCustosAgent/dnsfilter.conf!\n" + eio.toString());
 		}
 	}
 
@@ -1130,7 +1130,7 @@ public class DNSProxyActivity extends Activity
 			onCopyFilterFromLogView(false);
 			return;
 		} else if (destination == helpBtn) {
-			openBrowser("https://www.zenz-home.com/personaldnsfilter/help/help.php");
+			openBrowser("https://www.zenz-home.com/DomCustosAgent/help/help.php");
 			return;
 		} else if (destination == dnsField) {
             startActivityForResult(new Intent(this, DNSServerConfigActivity.class), DNSServerConfigActivity.ACTIVITY_RESULT_CODE);

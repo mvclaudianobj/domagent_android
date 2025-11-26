@@ -2,7 +2,7 @@ package dnsfilter.android;
 
 import android.app.Application;
 
-public class PersonalDNSFilterApp extends Application {
+public class DomCustosAgentApp extends Application {
 
     @Override
     public void onCreate() {

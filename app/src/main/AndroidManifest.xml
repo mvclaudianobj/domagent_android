@@ -19,10 +19,10 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="personalDNSfilter"
+        android:label="DomCustosAgent"
         android:theme="@style/Theme.phttpp.TitleBar"
         android:usesCleartextTraffic="true"
-        android:name=".PersonalDNSFilterApp">
+        android:name=".DomCustosAgentApp">
 
         <activity
             android:name=".dnsserverconfig.DNSServerConfigActivity"
@@ -33,7 +33,7 @@
 
         <activity
             android:name=".DNSProxyActivity"
-            android:label="personalDNSfilter"
+            android:label="DomCustosAgent"
             android:windowSoftInputMode="adjustPan"
             android:exported = "true">
             <intent-filter>
@@ -46,7 +46,7 @@
         <service
             android:name=".DNSFilterService"
             android:foregroundServiceType="specialUse"
-            android:label="personalDNSfilterService"
+            android:label="DomCustosAgentService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="true">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
@@ -58,7 +58,7 @@
 
         <service
             android:name=".DNSFilterTileService"
-            android:label="personalDNSfilter"
+            android:label="DomCustosAgent"
             android:icon="@drawable/icon_disabled"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">

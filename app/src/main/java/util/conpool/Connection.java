@@ -1,6 +1,6 @@
  /* 
  PersonalHttpProxy 1.5
- PersonalDNSfilter 1.5
+ DomCustosAgent 1.5
  Copyright (C) 2013-2019 Ingo Zenz
 
  This program is free software; you can redistribute it and/or

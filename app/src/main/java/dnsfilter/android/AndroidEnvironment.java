@@ -1,5 +1,5 @@
 /*
- PersonalDNSFilter 1.5
+ DomCustosAgent 1.5
  Copyright (C) 2017-2020 Ingo Zenz
 
  This program is free software; you can redistribute it and/or
@@ -16,7 +16,7 @@
  along with this program; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
- Find the latest version at http://www.zenz-solutions.de/personaldnsfilter
+ Find the latest version at http://www.zenz-solutions.de/DomCustosAgent
  Contact:i.z@gmx.net
  */
 
@@ -60,9 +60,9 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
             context.getExternalFilesDirs(null); //Seems on some devices this has to be called once before accessing Files...
             File dir = context.getExternalFilesDir(null);
             if (dir != null)
-                WORKDIR = dir.getAbsolutePath() + "/PersonalDNSFilter";
+                WORKDIR = dir.getAbsolutePath() + "/DomCustosAgent";
 
-            String backwardcompWorkdir = "/storage/emulated/0/Android/data/dnsfilter.android/files/PersonalDNSFilter";
+            String backwardcompWorkdir = "/storage/emulated/0/Android/data/dnsfilter.android/files/DomCustosAgent";
             try {
                 if (WORKDIR == null || !new File(WORKDIR).exists()) {
                     if (new File(backwardcompWorkdir).exists())
@@ -72,7 +72,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
                 e.printStackTrace();
             }
         } else
-            WORKDIR = Environment.getExternalStorageDirectory().getAbsolutePath() + "/PersonalDNSFilter";
+            WORKDIR = Environment.getExternalStorageDirectory().getAbsolutePath() + "/DomCustosAgent";
     }
 
     private void waitForStorage() {
@@ -87,7 +87,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
                 dir = ctx.getExternalFilesDir(null);
 
                 if (dir != null) {
-                    WORKDIR = dir.getAbsolutePath() + "/PersonalDNSFilter";
+                    WORKDIR = dir.getAbsolutePath() + "/DomCustosAgent";
                     return;
                 }
                 try {
@@ -97,7 +97,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
                 }
             }
         }
-        boolean pathExists = new File("/storage/emulated/0/Android/data/dnsfilter.android/files/PersonalDNSFilter").exists();
+        boolean pathExists = new File("/storage/emulated/0/Android/data/dnsfilter.android/files/DomCustosAgent").exists();
         throw new IllegalStateException("Cannot get external storage!"+pathExists);
     }
 
@@ -115,7 +115,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
     public void wakeLock(){
         WifiManager.WifiLock wifiLock = ((WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).createWifiLock(WifiManager.WIFI_MODE_FULL, "personalHttpProxy");
         wifiLock.acquire();
-        PowerManager.WakeLock wakeLock = ((PowerManager) ctx.getSystemService(Context.POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "personalDNSfilter:wakelock");
+        PowerManager.WakeLock wakeLock = ((PowerManager) ctx.getSystemService(Context.POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DomCustosAgent:wakelock");
         wakeLock.acquire();
         wakeLooks.push(new Object[]{wifiLock, wakeLock});
         Logger.getLogger().logLine("Acquired WIFI lock and partial wake lock!");
@@ -208,7 +208,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
         //TO BE DELETED ONCE ON TARGET 11! MIGRATION OF CONFIG DATA TO EXTERNAL USER FOLDER
         File F_WORKDIR = new File(WORKDIR);
         if (!F_WORKDIR.exists() && storagePermission) {
-            File OLDPATH = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/PersonalDNSFilter");
+            File OLDPATH = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/DomCustosAgent");
             if (OLDPATH.exists() && !OLDPATH.equals(F_WORKDIR)) {
                 try {
                     Utils.moveFileTree(OLDPATH, F_WORKDIR);

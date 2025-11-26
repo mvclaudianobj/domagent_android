@@ -1,5 +1,5 @@
 /*
- PersonalDNSFilter 1.5
+ DomCustosAgent 1.5
  Copyright (C) 2017 Ingo Zenz
 
  This program is free software; you can redistribute it and/or
@@ -16,7 +16,7 @@
  along with this program; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
- Find the latest version at http://www.zenz-solutions.de/personaldnsfilter
+ Find the latest version at http://www.zenz-solutions.de/DomCustosAgent
  Contact:i.z@gmx.net
  */
 
@@ -94,7 +94,7 @@ public class DNSFilterManager extends ConfigurationAccess  {
 	private static RemoteAccessServer remoteAccessManager ;
 
 
-	private static String DOWNLOADED_FF_PREFIX= "# Downloaded by personalDNSFilter at: ";
+	private static String DOWNLOADED_FF_PREFIX= "# Downloaded by DomCustosAgent at: ";
 
 
 	protected Properties config = null;
@@ -1440,7 +1440,7 @@ public class DNSFilterManager extends ConfigurationAccess  {
 
 			initEnv();
 
-			Logger.getLogger().logLine("***Initializing personalDNSfilter Version " + VERSION + "!***");
+			Logger.getLogger().logLine("***Initializing DomCustosAgent Version " + VERSION + "!***");
 			Logger.getLogger().logLine("Using directory: "+ getPath());
 
 			byte[] configBytes = readConfig();
