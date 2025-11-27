@@ -207,7 +207,7 @@ public class FilterConfig implements OnClickListener, DialogInterface.OnKeyListe
 		try {
 			Properties defaults = ConfigurationAccess.getCurrent().getDefaultConfig();
 			clear();
-			DNSProxyActivity.filterReloadIntervalView.setText(defaults.getProperty("reloadIntervalDays", "7"));
+            AdvancedSettingsActivity.filterReloadIntervalView.setText(defaults.getProperty("reloadIntervalDays", "7"));
 			setEntries(ConfigUtil.getConfiguredFilterLists(defaults));
 			load();
 		} catch (Exception e) {
@@ -254,7 +254,7 @@ public class FilterConfig implements OnClickListener, DialogInterface.OnKeyListe
 		((TextView)editDialog.findViewById(R.id.filterUrl)).setText(((TextView)currentContent[3]).getText().toString());
 		editDialog.show();
 		Window window = editDialog .getWindow();
-		window.setLayout((int) (DNSProxyActivity.DISPLAY_WIDTH*0.9), WindowManager.LayoutParams.WRAP_CONTENT);
+		window.setLayout((int) (AdvancedSettingsActivity.DISPLAY_WIDTH*0.9), WindowManager.LayoutParams.WRAP_CONTENT);
 		window.setBackgroundDrawableResource(android.R.color.transparent);
 	}
 

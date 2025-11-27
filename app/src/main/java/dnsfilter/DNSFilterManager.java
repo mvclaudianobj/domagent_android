@@ -37,6 +37,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.InetAddress;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Date;
@@ -62,7 +63,8 @@ import util.LoggerInterface;
 import util.PatternSequence;
 import util.Utils;
 import util.conpool.TLSSocketFactory;
-
+import android.util.Base64;
+import org.json.JSONObject;
 
 public class DNSFilterManager extends ConfigurationAccess  {
 
@@ -93,16 +95,619 @@ public class DNSFilterManager extends ConfigurationAccess  {
 
 	private static RemoteAccessServer remoteAccessManager ;
 
-
 	private static String DOWNLOADED_FF_PREFIX= "# Downloaded by DomCustosAgent at: ";
 
-
 	protected Properties config = null;
-
 
 	public static  DNSFilterManager getInstance(){
 		return INSTANCE;
 	}
+
+    // ✅ Configuração da API
+    private static final String API_BASE_URL = "https://domcustos.com.br/api";
+    private static final String ACTIVATION_ENDPOINT = "/agent/activate";
+    private static final int REQUEST_TIMEOUT = 30000; // 30 segundos
+
+    // =============================
+    // 🔐 SISTEMA DE ATIVAÇÃO DO AGENT
+    // =============================
+    private static final String PREFS_NAME = "DomCustosAgent_Permanent";
+    private static final String IS_ACTIVATED_KEY = "is_activated";
+    private static final String AGENT_ID_KEY = "agent_id";
+
+    private boolean isAgentActivated = false;
+    private String agentId = null;
+    private boolean dohEnabled = false;
+
+    // =============================
+    // 🔐 GERA agent_id CURTO
+    // =============================
+    private String generateShortAgentId() {
+        try {
+            // Usar informações do sistema para gerar ID único
+            String systemInfo = System.getProperty("os.name", "") +
+                    System.getProperty("os.version", "") +
+                    System.getProperty("user.name", "") +
+                    new Date().getTime();
+
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(systemInfo.getBytes());
+
+            // Pegar apenas os primeiros 12 bytes para ID curto
+            byte[] shortHash = new byte[12];
+            System.arraycopy(hash, 0, shortHash, 0, 12);
+
+            return Base64.encodeToString(shortHash, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+        } catch (Exception e) {
+            // Fallback: usar timestamp
+            return "agent_" + System.currentTimeMillis();
+        }
+    }
+
+    // =============================
+    // 📋 VERIFICAÇÃO DE ATIVAÇÃO
+    // =============================
+    private void checkAgentActivationStatus() {
+        try {
+            // Ler preferências do arquivo de configuração
+            File prefsFile = new File(getPath() + "agent_prefs.conf");
+            Properties agentPrefs = new Properties();
+
+            if (prefsFile.exists()) {
+                FileInputStream fis = new FileInputStream(prefsFile);
+                agentPrefs.load(fis);
+                fis.close();
+
+                isAgentActivated = Boolean.parseBoolean(agentPrefs.getProperty(IS_ACTIVATED_KEY, "false"));
+                agentId = agentPrefs.getProperty(AGENT_ID_KEY);
+
+                Logger.getLogger().logLine("🔍 Verificando ativação do agent:");
+                Logger.getLogger().logLine("   Arquivo: " + prefsFile.getAbsolutePath());
+                Logger.getLogger().logLine("   Ativado: " + isAgentActivated);
+                Logger.getLogger().logLine("   Agent ID: " + agentId);
+
+                if (agentId == null) {
+                    agentId = generateShortAgentId();
+                    saveAgentPreferences();
+                    Logger.getLogger().logLine("   ✅ Novo Agent ID gerado: " + agentId);
+                }
+            } else {
+                // Primeira execução - gerar ID mas não ativar
+                agentId = generateShortAgentId();
+                isAgentActivated = false;
+                saveAgentPreferences();
+                Logger.getLogger().logLine("🔍 Primeira execução - Agent ID gerado: " + agentId);
+            }
+
+            Logger.getLogger().logLine("Agent activation status: " + (isAgentActivated ? "ACTIVATED" : "NOT ACTIVATED"));
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("❌ Error checking agent activation: " + e.getMessage());
+            isAgentActivated = false;
+        }
+    }
+
+    // =============================
+    // 💾 SALVAR PREFERÊNCIAS DO AGENT
+    // =============================
+    private void saveAgentPreferences() {
+        try {
+            File prefsFile = new File(getPath() + "agent_prefs.conf");
+            Properties agentPrefs = new Properties();
+
+            agentPrefs.setProperty(IS_ACTIVATED_KEY, String.valueOf(isAgentActivated));
+            if (agentId != null) {
+                agentPrefs.setProperty(AGENT_ID_KEY, agentId);
+            }
+
+            FileOutputStream fos = new FileOutputStream(prefsFile);
+            agentPrefs.store(fos, "DomCustos Agent Preferences");
+            fos.close();
+
+            Logger.getLogger().logLine("Agent preferences saved");
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Error saving agent preferences: " + e.getMessage());
+        }
+    }
+
+    // =============================
+    // 🔧 CONTROLE DOH BASEADO NA ATIVAÇÃO
+    // =============================
+    private boolean shouldEnableDOH() {
+        // DoH só é habilitado se:
+        // 1. Agent está ativado
+        // 2. Configuração permite DoH
+
+        if (!isAgentActivated) {
+            return false;
+        }
+
+        try {
+            // Verificar se DoH está configurado nos DNS servers
+            String fallbackDNS = config.getProperty("fallbackDNS", "");
+
+            // Se tem servidores DoH configurados e agent está ativado
+            boolean hasDoHServers = fallbackDNS.contains("https://") || fallbackDNS.contains("DoH");
+
+            return hasDoHServers && isAgentActivated;
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Error checking DoH configuration: " + e.toString());
+            return false;
+        }
+    }
+
+    private void applyDOHConfiguration() {
+        dohEnabled = shouldEnableDOH();
+
+        if (dohEnabled) {
+            Logger.getLogger().logLine("🚀 DoH ENABLED - Agent is activated");
+            Logger.getLogger().logLine("🔐 Encrypted DNS queries active");
+
+            // ✅ Configurar servidores DoH
+            try {
+                if (config != null) {
+                    // Aqui você pode aplicar configurações específicas de DoH
+                    // Por exemplo, priorizar servidores HTTPS no fallbackDNS
+                    String fallbackDNS = config.getProperty("fallbackDNS", "");
+
+                    if (!fallbackDNS.contains("https://")) {
+                        // Adicionar servidores DoH padrão se não houver
+                        String dohServers = "https://dns.google/dns-query; https://cloudflare-dns.com/dns-query";
+                        config.setProperty("fallbackDNS", dohServers + "; " + fallbackDNS);
+                        Logger.getLogger().logLine("📝 DoH servers configured");
+                    }
+                }
+            } catch (Exception e) {
+                Logger.getLogger().logLine("Warning: Could not configure DoH servers: " + e.toString());
+            }
+
+        } else {
+            Logger.getLogger().logLine("🔧 Using standard DNS (port 53) - Agent not activated or DoH not configured");
+
+            // ✅ Garantir que está usando DNS padrão
+            try {
+                if (config != null) {
+                    String fallbackDNS = config.getProperty("fallbackDNS", "");
+
+                    // Remover servidores DoH se agent não está ativado
+                    if (fallbackDNS.contains("https://")) {
+                        // Filtrar apenas servidores não-DoH
+                        String[] servers = fallbackDNS.split(";");
+                        StringBuilder standardDNS = new StringBuilder();
+
+                        for (String server : servers) {
+                            if (!server.trim().startsWith("https://")) {
+                                if (standardDNS.length() > 0) standardDNS.append("; ");
+                                standardDNS.append(server.trim());
+                            }
+                        }
+
+                        // Se não sobrou nenhum servidor, usar DNS público padrão
+                        if (standardDNS.length() == 0) {
+                            standardDNS.append("8.8.8.8; 8.8.4.4");
+                        }
+
+                        config.setProperty("fallbackDNS", standardDNS.toString());
+                        Logger.getLogger().logLine("📝 Standard DNS servers configured");
+                    }
+                }
+            } catch (Exception e) {
+                Logger.getLogger().logLine("Warning: Could not configure standard DNS: " + e.toString());
+            }
+        }
+    }
+
+    // =============================
+    // 📞 ATIVAÇÃO DO AGENT VIA API
+    // =============================
+    public boolean activateAgent(String activationCode) {
+        try {
+            Logger.getLogger().logLine("🔍 Tentando ativar agent com código: " + activationCode);
+
+            // ✅ Validar formato do código
+            if (activationCode == null || activationCode.trim().isEmpty()) {
+                Logger.getLogger().logLine("❌ Código de ativação vazio");
+                return false;
+            }
+
+            if (activationCode.trim().length() < 4) {
+                Logger.getLogger().logLine("❌ Código de ativação muito curto");
+                return false;
+            }
+
+            // ✅ Gerar agent_id se ainda não existe
+            if (agentId == null || agentId.isEmpty()) {
+                agentId = generateShortAgentId();
+                Logger.getLogger().logLine("📝 Agent ID gerado: " + agentId);
+            }
+
+            // ✅ Coletar informações do sistema
+            Properties systemInfo = collectSystemInfo();
+
+            // ✅ Fazer requisição de ativação
+            boolean activationSuccess = performActivationRequest(activationCode, systemInfo);
+
+            if (activationSuccess) {
+                // ✅ Salvar ativação
+                isAgentActivated = true;
+                saveAgentPreferences();
+
+                // ✅ Aplicar configuração DoH
+                applyDOHConfiguration();
+
+                Logger.getLogger().logLine("✅ Agent ativado com sucesso!");
+                Logger.getLogger().logLine("🎯 DoH foi habilitado");
+
+                // ✅ Reiniciar serviços DNS se já estiver rodando
+                if (!serverStopped) {
+                    Logger.getLogger().logLine("🔄 Reiniciando serviços DNS com DoH...");
+                    restartDNSServices();
+                }
+
+                return true;
+            } else {
+                Logger.getLogger().logLine("❌ Falha na ativação do agent");
+                return false;
+            }
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("❌ Erro durante ativação: " + e.getMessage());
+            Logger.getLogger().logException(e);
+            return false;
+        }
+    }
+
+    // =============================
+    // 🌐 REQUISIÇÃO HTTP DE ATIVAÇÃO
+    // =============================
+    private boolean performActivationRequest(String activationCode, Properties systemInfo) {
+        HttpURLConnection connection = null;
+
+        try {
+            // ✅ Construir URL
+            String urlString = API_BASE_URL + ACTIVATION_ENDPOINT;
+            Logger.getLogger().logLine("🌐 Conectando a: " + urlString);
+
+            URL url = new URL(urlString);
+            connection = (HttpURLConnection) url.openConnection();
+
+            // ✅ Configurar conexão
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection httpsConnection = (HttpsURLConnection) connection;
+                // Aceitar certificados SSL (em produção, validar corretamente)
+                // httpsConnection.setSSLSocketFactory(getTrustAllSSLFactory());
+            }
+
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "DomCustosAgent/" + VERSION);
+            connection.setDoOutput(true);
+            connection.setDoInput(true);
+            connection.setConnectTimeout(REQUEST_TIMEOUT);
+            connection.setReadTimeout(REQUEST_TIMEOUT);
+
+            // ✅ Preparar dados JSON usando JSONObject do Android
+            JSONObject requestData = new JSONObject();
+            requestData.put("activation_code", activationCode);
+            requestData.put("agent_id", agentId);
+            requestData.put("os_type", systemInfo.getProperty("os_type"));
+            requestData.put("version", VERSION);
+            requestData.put("public_ip", systemInfo.getProperty("public_ip", ""));
+            requestData.put("last_local_ip", systemInfo.getProperty("local_ip", ""));
+            requestData.put("mac_address", systemInfo.getProperty("mac_address", ""));
+            requestData.put("hostname", systemInfo.getProperty("hostname", ""));
+
+            Logger.getLogger().logLine("📤 Enviando dados de ativação...");
+            Logger.getLogger().logLine("📋 Código: " + activationCode);
+            Logger.getLogger().logLine("📋 Agent ID: " + agentId);
+
+            // ✅ Enviar requisição
+            OutputStream os = connection.getOutputStream();
+            os.write(requestData.toString().getBytes("UTF-8"));
+            os.flush();
+            os.close();
+
+            // ✅ Ler resposta
+            int responseCode = connection.getResponseCode();
+            Logger.getLogger().logLine("📥 Response Code: " + responseCode);
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // ✅ Sucesso - ler resposta
+                InputStream is = connection.getInputStream();
+                String response = readInputStream(is);
+                is.close();
+
+                Logger.getLogger().logLine("✅ Resposta do servidor: " + response);
+
+                // ✅ Parsear resposta JSON
+                JSONObject jsonResponse = new JSONObject(response);
+
+                if (jsonResponse.has("message")) {
+                    Logger.getLogger().logLine("✅ " + jsonResponse.getString("message"));
+                }
+
+                if (jsonResponse.has("agent")) {
+                    JSONObject agentData = jsonResponse.getJSONObject("agent");
+                    Logger.getLogger().logLine("📊 Agent Data:");
+                    Logger.getLogger().logLine("   - ID: " + agentData.optString("id"));
+                    Logger.getLogger().logLine("   - Status: " + agentData.optString("is_active"));
+                }
+
+                return true;
+
+            } else {
+                // ❌ Erro - ler mensagem de erro
+                InputStream errorStream = connection.getErrorStream();
+                if (errorStream != null) {
+                    String errorResponse = readInputStream(errorStream);
+                    errorStream.close();
+
+                    Logger.getLogger().logLine("❌ Erro do servidor: " + errorResponse);
+
+                    try {
+                        JSONObject errorJson = new JSONObject(errorResponse);
+                        if (errorJson.has("error")) {
+                            String errorMsg = errorJson.getString("error");
+                            Logger.getLogger().logLine("❌ " + errorMsg);
+
+                            if (errorMsg.contains("inválido")) {
+                                Logger.getLogger().message("Código de ativação inválido!");
+                            }
+                        }
+                    } catch (Exception e) {
+                        Logger.getLogger().logLine("❌ Erro ao parsear resposta: " + e.toString());
+                    }
+                }
+
+                return false;
+            }
+
+        } catch (java.net.UnknownHostException e) {
+            Logger.getLogger().logLine("❌ Erro de conexão: Servidor não encontrado");
+            Logger.getLogger().logLine("   Verifique sua conexão com a internet");
+            return false;
+
+        } catch (java.net.SocketTimeoutException e) {
+            Logger.getLogger().logLine("❌ Timeout na conexão com o servidor");
+            Logger.getLogger().logLine("   Tente novamente mais tarde");
+            return false;
+
+        } catch (IOException e) {
+            Logger.getLogger().logLine("❌ Erro de I/O: " + e.getMessage());
+            Logger.getLogger().logException(e);
+            return false;
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("❌ Erro inesperado: " + e.getMessage());
+            Logger.getLogger().logException(e);
+            return false;
+
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    // =============================
+    // 📊 COLETAR INFORMAÇÕES DO SISTEMA
+    // =============================
+    private Properties collectSystemInfo() {
+        Properties info = new Properties();
+
+        try {
+            // OS Type
+            String osName = System.getProperty("os.name", "").toLowerCase();
+            if (osName.contains("android")) {
+                info.setProperty("os_type", "android");
+            } else if (osName.contains("linux")) {
+                info.setProperty("os_type", "linux");
+            } else if (osName.contains("windows")) {
+                info.setProperty("os_type", "windows");
+            } else {
+                info.setProperty("os_type", "unknown");
+            }
+
+            // Hostname
+            try {
+                String hostname = java.net.InetAddress.getLocalHost().getHostName();
+                info.setProperty("hostname", hostname);
+            } catch (Exception e) {
+                info.setProperty("hostname", "unknown");
+            }
+
+            // Local IP
+            try {
+                String localIp = getLocalIpAddress();
+                info.setProperty("local_ip", localIp != null ? localIp : "unknown");
+            } catch (Exception e) {
+                info.setProperty("local_ip", "unknown");
+            }
+
+            // MAC Address
+            try {
+                String macAddress = getMacAddress();
+                info.setProperty("mac_address", macAddress != null ? macAddress : "unknown");
+            } catch (Exception e) {
+                info.setProperty("mac_address", "unknown");
+            }
+
+            // Public IP (opcional - pode fazer requisição externa)
+            info.setProperty("public_ip", "");
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Aviso: Não foi possível coletar todas as informações do sistema");
+        }
+
+        return info;
+    }
+
+    // =============================
+    // 🌐 OBTER IP LOCAL
+    // =============================
+    private String getLocalIpAddress() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface iface = interfaces.nextElement();
+
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
+
+                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
+
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress addr = addresses.nextElement();
+
+                    if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Erro ao obter IP local: " + e.toString());
+        }
+
+        return null;
+    }
+
+    // =============================
+    // 🔧 OBTER MAC ADDRESS
+    // =============================
+    private String getMacAddress() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface iface = interfaces.nextElement();
+
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
+
+                byte[] mac = iface.getHardwareAddress();
+
+                if (mac != null && mac.length > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < mac.length; i++) {
+                        sb.append(String.format("%02X%s", mac[i], (i < mac.length - 1) ? ":" : ""));
+                    }
+                    return sb.toString();
+                }
+            }
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Erro ao obter MAC address: " + e.toString());
+        }
+
+        return null;
+    }
+
+    // =============================
+    // 📖 LER INPUTSTREAM
+    // =============================
+    private String readInputStream(InputStream is) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+        StringBuilder response = new StringBuilder();
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+            response.append(line);
+        }
+
+        return response.toString();
+    }
+
+    private String getOSType() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("android")) return "android";
+        if (osName.contains("linux")) return "linux";
+        if (osName.contains("windows")) return "windows";
+        return "unknown";
+    }
+
+    // =============================
+    // 🔄 REINICIAR SERVIÇOS DNS
+    // =============================
+    private void restartDNSServices() {
+        try {
+            Logger.getLogger().logLine("Restarting DNS services with new configuration...");
+
+            // Parar serviços DNS existentes
+            if (!serverStopped) {
+                stopDNSServices();
+            }
+
+            // Iniciar com nova configuração
+            initDNSServices();
+
+            Logger.getLogger().logLine("DNS services restarted successfully");
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Error restarting DNS services: " + e.getMessage());
+        }
+    }
+
+    private void stopDNSServices() {
+        try {
+            if (autoFilterUpdater != null) {
+                autoFilterUpdater.stop();
+                autoFilterUpdater = null;
+            }
+
+            if (hostFilter != null) {
+                hostFilter.clear();
+            }
+
+            DNSResponsePatcher.init(null, null);
+            serverStopped = true;
+
+            Logger.getLogger().logLine("DNS services stopped");
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Error stopping DNS services: " + e.getMessage());
+        }
+    }
+
+    private void initDNSServices() throws IOException {
+        // Reaplicar configuração DoH
+        applyDOHConfiguration();
+
+        // Reinicializar filtros e serviços
+        reloadFilter(true);
+
+        if (filterReloadURL != null) {
+            autoFilterUpdater = new AutoFilterUpdater();
+            Thread t = new Thread(autoFilterUpdater);
+            t.setDaemon(true);
+            t.start();
+        }
+
+        DNSResponsePatcher.init(hostFilter, TRAFFIC_LOG);
+        serverStopped = false;
+    }
+
+    // =============================
+    // 📊 MÉTODOS PÚBLICOS PARA STATUS
+    // =============================
+    public boolean isAgentActivated() {
+        return isAgentActivated;
+    }
+
+    public String getAgentId() {
+        return agentId;
+    }
+
+    public boolean isDohEnabled() {
+        return dohEnabled;
+    }
+
+    public String getActivationStatus() {
+        return isAgentActivated ? "ACTIVATED" : "NOT_ACTIVATED";
+    }
 
 	private DNSFilterManager() {
 		// read Configs etc
@@ -633,37 +1238,29 @@ public class DNSFilterManager extends ConfigurationAccess  {
 	}
 
 	@Override
-	public void doRestore(InputStream in) throws IOException {
-		try {
-			if (!canStop())
-				throw new IOException("Cannot stop! Pending operation!");
-			stop();
-			invalidate();
-			ZipInputStream zip = new ZipInputStream(in);
-			ZipEntry entry = zip.getNextEntry();
-			try {
-				while (entry != null) {
-					restoreZipEntry(entry, zip);
-					entry = zip.getNextEntry();
-				}
-				zip.close();
-			} catch (Exception e) {
-				Logger.getLogger().logException(e);
-				throw e;
-			}
-			getConfigMergedIfNeeded();
-
-			//cleanup hostsfile and index in order to force reload
-			String filterHostFile = null;
-			if (config != null && ((filterHostFile = config.getProperty("filterHostsFile")) != null)) {
-				new File(getPath() + filterHostFile).delete();
-			}
-			init();
-			ExecutionEnvironment.getEnvironment().onReload();
-		} catch (IOException e) {
-			throw new ConfigurationAccessException(e.getMessage(), e);
-		}
-	}
+    public void doRestore(InputStream in) throws IOException {
+        if (!canStop())
+            throw new IOException("Cannot stop! Pending operation!");
+        stop();
+        invalidate();
+        ZipInputStream zip = new ZipInputStream(in);
+        ZipEntry entry = zip.getNextEntry();
+        try {
+            while (entry != null) {
+                restoreZipEntry(entry, zip);
+                entry = zip.getNextEntry();
+            }
+            zip.close();
+        } catch (IOException e) {
+            // Relança IOExceptions diretamente
+            Logger.getLogger().logException(e);
+            throw e;
+        } catch (Exception e) {
+            // Converte outras exceções para IOException
+            Logger.getLogger().logException(e);
+            throw new IOException("Restore failed: " + e.getMessage(), e);
+        }
+    }
 
 	@Override
 	public void wakeLock()  {
@@ -1443,9 +2040,24 @@ public class DNSFilterManager extends ConfigurationAccess  {
 			Logger.getLogger().logLine("***Initializing DomCustosAgent Version " + VERSION + "!***");
 			Logger.getLogger().logLine("Using directory: "+ getPath());
 
+            // ✅ VERIFICAR ATIVAÇÃO DO AGENT PRIMEIRO
+            checkAgentActivationStatus();
+
 			byte[] configBytes = readConfig();
 			config = new Properties();
 			config.load(new ByteArrayInputStream(configBytes));
+
+            // ✅ APLICAR CONFIGURAÇÃO DOH BASEADA NA ATIVAÇÃO
+            applyDOHConfiguration();
+
+            // ✅ LOG DE STATUS DE ATIVAÇÃO
+            if (isAgentActivated) {
+                Logger.getLogger().logLine("✅ Agent is ACTIVATED");
+                Logger.getLogger().logLine("🔐 DoH is " + (dohEnabled ? "ENABLED" : "DISABLED"));
+            } else {
+                Logger.getLogger().logLine("ℹ️ Agent is NOT ACTIVATED");
+                Logger.getLogger().logLine("🔧 Using standard DNS (port 53)");
+            }
 
 			DNSServer.init();
 
@@ -1545,6 +2157,34 @@ public class DNSFilterManager extends ConfigurationAccess  {
 		}
 	}
 
+    // =============================
+    // 📝 LOGS PARA API (similar ao DomainLogger)
+    // =============================
+    public void logDomainAccess(String domain, String action, String details) {
+        if (!isAgentActivated) {
+            return; // Só enviar logs se agent estiver ativado
+        }
+
+        try {
+            // Usar Properties em vez de JSONObject
+            Properties logData = new Properties();
+            logData.setProperty("agent_id", agentId != null ? agentId : "");
+            logData.setProperty("event_type", "domain_" + action);
+            logData.setProperty("target", domain);
+            logData.setProperty("timestamp", String.valueOf(System.currentTimeMillis()));
+            logData.setProperty("details", details);
+            logData.setProperty("doh_enabled", String.valueOf(dohEnabled));
+
+            Logger.getLogger().logLine("📊 Domain " + action + ": " + domain + " (Agent: " + agentId + ")");
+            Logger.getLogger().logLine("Log data: " + logData.toString());
+
+            // Aqui você implementaria o envio real para a API
+            // sendLogToAPI(logData);
+
+        } catch (Exception e) {
+            Logger.getLogger().logLine("Error logging domain access: " + e.getMessage());
+        }
+    }
 
 	@Override
 	public void stop() throws IOException {

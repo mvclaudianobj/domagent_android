@@ -24,23 +24,47 @@
         android:usesCleartextTraffic="true"
         android:name=".DomCustosAgentApp">
 
+        <!-- Activity Principal (Tela Simples) -->
+        <activity
+            android:name=".DNSProxyActivity"
+            android:label="DomCustos Agent"
+            android:windowSoftInputMode="adjustPan"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Intent Filter para receber dados de outras activities -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity de Configurações Avançadas -->
+        <activity
+            android:name=".AdvancedSettingsActivity"
+            android:label="Configurações Avançadas"
+            android:theme="@style/Theme.phttpp.TitleBar"
+            android:windowSoftInputMode="adjustPan"
+            android:exported="false"
+            android:parentActivityName=".DNSProxyActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".DNSProxyActivity" />
+        </activity>
+
+        <!-- Activity de Configuração DNS -->
         <activity
             android:name=".dnsserverconfig.DNSServerConfigActivity"
             android:theme="@style/Theme.phttpp.TitleBar.DNSConfig"
             android:exported="false"
-            android:parentActivityName=".DNSProxyActivity">
-        </activity>
-
-        <activity
-            android:name=".DNSProxyActivity"
-            android:label="DomCustosAgent"
-            android:windowSoftInputMode="adjustPan"
-            android:exported = "true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            android:parentActivityName=".AdvancedSettingsActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".AdvancedSettingsActivity" />
         </activity>
 
         <service

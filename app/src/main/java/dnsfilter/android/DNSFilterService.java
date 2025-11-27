@@ -291,7 +291,7 @@ public class DNSFilterService extends VpnService  {
 
 		@Override
 		public void run() {
-			if (explicitOperation || DNSProxyActivity.debug)
+			if (explicitOperation || AdvancedSettingsActivity.debug)
 				Logger.getLogger().logLine("VPN runner thread "+id+" started!");
 			thread = Thread.currentThread();
 
@@ -314,7 +314,7 @@ public class DNSFilterService extends VpnService  {
 						try {
 							IPPacket parsedIP = new IPPacket(data, 0, length);
 							if (parsedIP.getVersion() == 6) {
-								if (DNSProxyActivity.debug) { //IPV6 Debug Logging
+								if (AdvancedSettingsActivity.debug) { //IPV6 Debug Logging
 									Logger.getLogger().logLine("!!!IPV6 packet!!! Protocol:" + parsedIP.getProt());
 									Logger.getLogger().logLine("SourceAddress:" + IPPacket.int2ip(parsedIP.getSourceIP()));
 									Logger.getLogger().logLine("DestAddress:" + IPPacket.int2ip(parsedIP.getDestIP()));
@@ -333,7 +333,7 @@ public class DNSFilterService extends VpnService  {
 								throw new IOException("IP header checksum error!");
 
 							if (parsedIP.getProt() == 1) {
-								if (DNSProxyActivity.debug) Logger.getLogger().logLine("Received ICMP packet type:" + (data[20] & 0xff));
+								if (AdvancedSettingsActivity.debug) Logger.getLogger().logLine("Received ICMP packet type:" + (data[20] & 0xff));
 							}
 							if (parsedIP.getProt() == 17) {
 
@@ -360,7 +360,7 @@ public class DNSFilterService extends VpnService  {
 				}
 			}
 
-			if (explicitOperation || DNSProxyActivity.debug)
+			if (explicitOperation || AdvancedSettingsActivity.debug)
 				Logger.getLogger().logLine("VPN runner thread "+id+" terminated!");
 		}
 
@@ -460,18 +460,18 @@ public class DNSFilterService extends VpnService  {
 
 	private static String[] getDNSServers() throws IOException {
 
-		if (DNSProxyActivity.debug)
+		if (AdvancedSettingsActivity.debug)
 			Logger.getLogger().logLine("Detecting DNS servers...");
 
 		String[] dnsServers = getDNSviaConnectivityManager();
 
 		if (dnsServers.length == 0) {
-			if (DNSProxyActivity.debug)
+			if (AdvancedSettingsActivity.debug)
 				Logger.getLogger().logLine("Fallback DNS detection via SystemProperties");
 
 			dnsServers = getDNSviaSysProps();
 
-		} else if (DNSProxyActivity.debug)
+		} else if (AdvancedSettingsActivity.debug)
 			Logger.getLogger().logLine("DNS detection via ConnectivityManager");
 
 		return dnsServers;
@@ -535,7 +535,7 @@ public class DNSFilterService extends VpnService  {
 					for (int i = 0; i < dnsServers.length; i++) {
 						String value = dnsServers[i];
 						if (value != null && !value.equals("")) {
-							if (DNSProxyActivity.debug)
+							if (AdvancedSettingsActivity.debug)
 								Logger.getLogger().logLine("DNS:" + value);
 							if (!value.equals(VIRTUALDNS_IPV4) && !value.equals(VIRTUALDNS_IPV6))
 								dnsAdrs.add(DNSServer.getInstance().createDNSServer(DNSServer.UDP, InetAddress.getByName(value), 53, timeout, null));
@@ -789,7 +789,7 @@ public class DNSFilterService extends VpnService  {
 
 	public void pause_resume() throws IOException {
 		DNSFilterManager.getInstance().switchBlockingActive();
-		DNSProxyActivity.reloadLocalConfig();
+        AdvancedSettingsActivity.reloadLocalConfig();
 		updateNotification();
 	}
 

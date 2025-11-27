@@ -52,7 +52,7 @@ public class BootUpReceiver extends BroadcastReceiver {
 				StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().build());
 				context.startForegroundService(i);
 			} else {
-				DNSProxyActivity.BOOT_START = true;
+                AdvancedSettingsActivity.BOOT_START = true;
 				Intent i = new Intent(context, DNSProxyActivity.class);
 				i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				context.startActivity(i);

@@ -164,7 +164,7 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
 
     @Override
     public boolean debug() {
-        return DNSProxyActivity.debug;
+        return AdvancedSettingsActivity.debug;
     }
 
     @Override
