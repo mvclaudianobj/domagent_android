@@ -492,23 +492,19 @@ public class DNSFilterManager extends ConfigurationAccess  {
     }
 
     // =============================
-    // 📊 COLETAR INFORMAÇÕES DO SISTEMA
-    // =============================
+// 📊 COLETAR INFORMAÇÕES DO SISTEMA
+// =============================
     private Properties collectSystemInfo() {
         Properties info = new Properties();
 
         try {
-            // OS Type
-            String osName = System.getProperty("os.name", "").toLowerCase();
-            if (osName.contains("android")) {
-                info.setProperty("os_type", "android");
-            } else if (osName.contains("linux")) {
-                info.setProperty("os_type", "linux");
-            } else if (osName.contains("windows")) {
-                info.setProperty("os_type", "windows");
-            } else {
-                info.setProperty("os_type", "unknown");
-            }
+            // ✅ CORREÇÃO: Usar a função getOSType() que você já tem
+            String osType = getOSType();
+            info.setProperty("os_type", osType);
+
+            // ✅ Adicionar também o os.name original para referência
+            String osName = System.getProperty("os.name", "");
+            info.setProperty("os_name", osName);
 
             // Hostname
             try {
@@ -536,6 +532,11 @@ public class DNSFilterManager extends ConfigurationAccess  {
 
             // Public IP (opcional - pode fazer requisição externa)
             info.setProperty("public_ip", "");
+
+            // ✅ Adicionar outras informações úteis do sistema
+            info.setProperty("java_version", System.getProperty("java.version", "unknown"));
+            info.setProperty("user_name", System.getProperty("user.name", "unknown"));
+            info.setProperty("user_home", System.getProperty("user.home", "unknown"));
 
         } catch (Exception e) {
             Logger.getLogger().logLine("Aviso: Não foi possível coletar todas as informações do sistema");
