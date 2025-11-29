@@ -896,6 +896,16 @@ public class AdvancedSettingsActivity extends Activity
 
     protected ConfigUtil getConfig() {
         try {
+            // Primeiro tenta via CONFIG (para modo remoto)
+            if (!CONFIG.isLocal()) {
+                return CONFIG.getConfigUtil();
+            }
+            // Para modo local, usa AdvancedFunctions (compartilhado com DNSProxyActivity)
+            ConfigUtil cfg = AdvancedFunctions.getConfig();
+            if (cfg != null) {
+                return cfg;
+            }
+            // Fallback para CONFIG local
             return CONFIG.getConfigUtil();
         } catch (Exception e){
             Logger.getLogger().logException(e);

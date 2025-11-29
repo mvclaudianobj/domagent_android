@@ -6,6 +6,7 @@ import android.util.Log;
 import android.app.Activity;
 import android.net.VpnService;
 import dnsfilter.ConfigurationAccess;
+import dnsfilter.ConfigUtil;
 import dnsfilter.DNSFilterManager;
 import util.ExecutionEnvironment;
 import util.Logger;
@@ -13,13 +14,17 @@ import util.LoggerInterface;
 import util.GroupedLogger;
 import util.SuppressRepeatingsLogger;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.util.Properties;
 
 public class AdvancedFunctions {
 
     private static final String TAG = "AdvancedFunctions";
     private static SuppressRepeatingsLogger myLogger;
     private static boolean initialized = false;
-    private static boolean serviceStarting = false; // ✅ CONTROLE DE ESTADO
+    private static boolean serviceStarting = false;
+    private static ConfigUtil configUtil = null;
+    private static Properties config = null;
 
     public static void initializeBackgroundFunctions(Context context) {
         if (initialized) {
@@ -350,5 +355,135 @@ public class AdvancedFunctions {
 
     public static boolean isInitialized() {
         return initialized;
+    }
+
+    // =============================
+    // 📋 MÉTODOS DE CONFIGURAÇÃO
+    // =============================
+
+    /**
+     * Carrega e retorna a configuração atual
+     */
+    public static ConfigUtil getConfig() {
+        try {
+            if (configUtil == null) {
+                loadConfig();
+            }
+            return configUtil;
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao obter configuração", e);
+            return null;
+        }
+    }
+
+    /**
+     * Carrega a configuração do arquivo
+     */
+    public static void loadConfig() {
+        try {
+            // Usar getConfigUtil() que é público
+            configUtil = ConfigurationAccess.getLocal().getConfigUtil();
+            
+            byte[] configBytes = ConfigurationAccess.getLocal().readConfig();
+            config = new Properties();
+            config.load(new ByteArrayInputStream(configBytes));
+            
+            Log.d(TAG, "✅ Configuração carregada com sucesso");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao carregar configuração", e);
+        }
+    }
+
+    /**
+     * Retorna as properties de configuração
+     */
+    public static Properties getConfigProperties() {
+        if (config == null) {
+            loadConfig();
+        }
+        return config;
+    }
+
+    /**
+     * Atualiza um valor de configuração
+     */
+    public static void updateConfigValue(String key, String value) {
+        try {
+            if (configUtil == null) {
+                loadConfig();
+            }
+            if (configUtil != null) {
+                configUtil.updateConfigValue(key, value);
+                ConfigurationAccess.getLocal().updateConfig(configUtil.getConfigBytes());
+                Log.d(TAG, "✅ Configuração atualizada: " + key + " = " + value);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao atualizar configuração", e);
+        }
+    }
+
+    /**
+     * Obtém um valor de configuração
+     */
+    public static String getConfigValue(String key, String defaultValue) {
+        try {
+            if (configUtil == null) {
+                loadConfig();
+            }
+            if (configUtil != null) {
+                return configUtil.getConfigValue(key, defaultValue);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao obter valor de configuração: " + key, e);
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Persiste a configuração atual
+     */
+    public static void persistConfig() {
+        try {
+            if (configUtil != null) {
+                ConfigurationAccess.getLocal().updateConfig(configUtil.getConfigBytes());
+                Log.d(TAG, "✅ Configuração persistida com sucesso");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao persistir configuração", e);
+        }
+    }
+
+    /**
+     * Invalida a configuração para forçar recarga
+     */
+    public static void invalidateConfig() {
+        configUtil = null;
+        config = null;
+        Log.d(TAG, "Configuração invalidada - será recarregada no próximo acesso");
+    }
+
+    /**
+     * Obtém o logger principal
+     */
+    public static SuppressRepeatingsLogger getLogger() {
+        return myLogger;
+    }
+
+    /**
+     * Define o tempo de supressão de logs repetidos
+     */
+    public static void setLoggerSuppressTime(long time) {
+        if (myLogger != null) {
+            myLogger.setSuppressTime(time);
+        }
+    }
+
+    /**
+     * Define o formato de timestamp do logger
+     */
+    public static void setLoggerTimestampFormat(String format) {
+        if (myLogger != null) {
+            myLogger.setTimestampFormat(format);
+        }
     }
 }
