@@ -38,6 +38,7 @@ import android.net.NetworkInfo;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.os.PowerManager;
 
 import java.io.DataOutputStream;
 import java.io.File;
@@ -108,6 +109,7 @@ public class DNSFilterService extends VpnService  {
 	PendingIntent pendingIntent;
 	private int mtu;
 	Notification.Builder notibuilder;
+	private PowerManager.WakeLock wakeLock;
 
 	protected static class DNSReqForwarder {
 		//used in case vpn mode is disabled for forwaring dns requests to local dns proxy
@@ -672,6 +674,11 @@ public class DNSFilterService extends VpnService  {
 		INSTANCE = this;
 		SERVICE = intent;
 
+		// Acquire wake lock to keep service running in background
+		PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+		wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DomCustosAgent::DNSFilterWakeLock");
+		wakeLock.acquire();
+
 		if (DNSFILTER != null) {
 			Logger.getLogger().logLine("DNS filter already running!");
 		} else {
@@ -945,6 +952,12 @@ public class DNSFilterService extends VpnService  {
 	public void onDestroy() {
 		Logger.getLogger().logLine("destroyed");
 		shutdown();
+
+		// Release wake lock
+		if (wakeLock != null && wakeLock.isHeld()) {
+			wakeLock.release();
+		}
+
 		super.onDestroy();
 	}
 

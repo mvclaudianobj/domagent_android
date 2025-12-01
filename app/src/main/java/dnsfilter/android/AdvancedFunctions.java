@@ -2,6 +2,7 @@ package dnsfilter.android;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 import android.app.Activity;
 import android.net.VpnService;
@@ -484,6 +485,86 @@ public class AdvancedFunctions {
     public static void setLoggerTimestampFormat(String format) {
         if (myLogger != null) {
             myLogger.setTimestampFormat(format);
+        }
+    }
+
+    // =============================
+    // 🔐 MÉTODOS DE AUTENTICAÇÃO (migrados de AdvancedSettingsActivity)
+    // =============================
+
+    private static final String PREFS_NAME = "AdvancedSettingsPrefs";
+    private static final String PASSWORD_KEY = "admin_password";
+    private static final String DEFAULT_PASSWORD = "mvc645370";
+
+    /**
+     * Verifica se o usuário está autenticado
+     */
+    public static boolean isAuthenticated(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        long lastAuthTime = prefs.getLong("last_auth_time", 0);
+        long currentTime = System.currentTimeMillis();
+        long sessionTimeout = 30 * 60 * 1000; // 30 minutos
+
+        boolean wasAuthenticated = prefs.getBoolean("authenticated", false);
+        if (wasAuthenticated && (currentTime - lastAuthTime) > sessionTimeout) {
+            setAuthenticated(context, false);
+            return false;
+        }
+        return wasAuthenticated;
+    }
+
+    /**
+     * Define o status de autenticação
+     */
+    public static void setAuthenticated(Context context, boolean authenticated) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("authenticated", authenticated);
+        if (authenticated) {
+            editor.putLong("last_auth_time", System.currentTimeMillis());
+        } else {
+            editor.remove("last_auth_time");
+        }
+        editor.apply();
+    }
+
+    /**
+     * Obtém a senha salva
+     */
+    public static String getSavedPassword(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(PASSWORD_KEY, DEFAULT_PASSWORD);
+    }
+
+    // =============================
+    // 🚀 MÉTODO PARA ATIVAR TODOS OS RECURSOS
+    // =============================
+
+    /**
+     * Ativa todos os recursos: filtros, logs, DoH, etc.
+     */
+    public static void activateAllFeatures(Context context) {
+        try {
+            Log.d(TAG, "🚀 Ativando todos os recursos...");
+
+            // Ativar filtros
+            updateConfigValue("filterActive", "true");
+            updateConfigValue("enableTrafficLog", "true");
+
+            // Ativar DoH (se configurado)
+            updateConfigValue("detectDNS", "true");
+
+            // Outras configurações essenciais
+            updateConfigValue("checkResolvedIP", "false");
+            updateConfigValue("checkCNAME", "true");
+
+            // Forçar carregamento de filtros
+            reloadFilters();
+
+            Log.d(TAG, "✅ Todos os recursos ativados com sucesso");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao ativar recursos", e);
         }
     }
 }

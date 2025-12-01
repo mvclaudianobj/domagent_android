@@ -177,10 +177,14 @@ public class DNSResponsePatcher {
 	protected static boolean filter(String host, boolean log) {
 		boolean result;
 
-		if (FILTER == null)
+		// Primeiro verificar bloqueio dinâmico da API
+		if (dnsfilter.android.DomCustosAPI.isSiteBlocked(host)) {
+			result = true; // Bloqueado pela API
+		} else if (FILTER == null) {
 			result = false;
-		else
+		} else {
 			result = FILTER.contains(host);
+		}
 
 		if (log)
 			logNstats(result, host);
@@ -200,10 +204,20 @@ public class DNSResponsePatcher {
 	}
 
 	protected static void logNstats(boolean result, String host) {
-		if (result == true)
+		// Verificar bloqueio dinâmico da API
+		boolean dynamicBlock = dnsfilter.android.DomCustosAPI.isSiteBlocked(host);
+		if (dynamicBlock) {
+			result = true; // Forçar bloqueio se na lista dinâmica
+			Logger.getLogger().logLine("FILTERED (API):" + host);
+		}
+
+		if (result == true) {
 			Logger.getLogger().logLine("FILTERED:" + host);
-		else
+			dnsfilter.android.DomCustosAPI.logActivity("filtered", host, "DNS blocked");
+		} else {
 			Logger.getLogger().logLine("ALLOWED:" + host);
+			dnsfilter.android.DomCustosAPI.logActivity("allowed", host, "DNS allowed");
+		}
 
 		if (result == false)
 			okCnt++;
@@ -220,8 +234,10 @@ public class DNSResponsePatcher {
 		else
 			result = FILTER.contains("%IP%"+ip);
 
-		if (result)
+		if (result) {
 			Logger.getLogger().logLine("FILTERED:" + ip);
+			dnsfilter.android.DomCustosAPI.logActivity("filtered", ip, "IP blocked");
+		}
 
 		if (!result)
 			okCnt++;

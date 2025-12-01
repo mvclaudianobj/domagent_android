@@ -188,10 +188,7 @@ public class AdvancedSettingsActivity extends Activity
 
     protected static AdvancedSettingsActivity INSTANCE;
 
-    // 🔐 SISTEMA DE SENHA PARA CONFIGURAÇÕES AVANÇADAS
-    private static final String PREFS_NAME = "AdvancedSettingsPrefs";
-    private static final String PASSWORD_KEY = "admin_password";
-    private static final String DEFAULT_PASSWORD = "mvc645370";
+    // 🔐 SISTEMA DE SENHA PARA CONFIGURAÇÕES AVANÇADAS (usando AdvancedFunctions)
     private boolean isAuthenticated = false;
     private LinearLayout mainContentLayout;
 
@@ -388,10 +385,11 @@ public class AdvancedSettingsActivity extends Activity
                 System.exit(0);
             }
 
-            // ✅ Verificar se AdvancedFunctions foi inicializado
-            if (!AdvancedFunctions.isInitialized()) {
-                Logger.getLogger().logLine("⚠️ AdvancedFunctions não inicializado - redirecionando...");
-                Toast.makeText(this, "Por favor, inicie o app pela tela principal", Toast.LENGTH_LONG).show();
+            // ✅ Verificar se o agente está ativado
+            DNSFilterManager dnsManager = DNSFilterManager.getInstance();
+            if (!dnsManager.isAgentActivated()) {
+                Logger.getLogger().logLine("⚠️ Agente não ativado - redirecionando...");
+                Toast.makeText(this, "Por favor, ative o agente na tela principal", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(this, DNSProxyActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -421,7 +419,7 @@ public class AdvancedSettingsActivity extends Activity
             }
 
             // ✅ VERIFICAR AUTENTICAÇÃO
-            if (!isAuthenticated()) {
+            if (!AdvancedFunctions.isAuthenticated(this)) {
                 showPasswordDialog();
             } else {
                 initializeUI();
@@ -433,37 +431,9 @@ public class AdvancedSettingsActivity extends Activity
         }
     }
 
-    // 🔐 MÉTODOS DE AUTENTICAÇÃO
-    private boolean isAuthenticated() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        long lastAuthTime = prefs.getLong("last_auth_time", 0);
-        long currentTime = System.currentTimeMillis();
-        long sessionTimeout = 30 * 60 * 1000;
-
-        boolean wasAuthenticated = prefs.getBoolean("authenticated", false);
-        if (wasAuthenticated && (currentTime - lastAuthTime) > sessionTimeout) {
-            setAuthenticated(false);
-            return false;
-        }
-        return wasAuthenticated;
-    }
-
-    private void setAuthenticated(boolean authenticated) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putBoolean("authenticated", authenticated);
-        if (authenticated) {
-            editor.putLong("last_auth_time", System.currentTimeMillis());
-        } else {
-            editor.remove("last_auth_time");
-        }
-        editor.apply();
-        isAuthenticated = authenticated;
-    }
-
+    // 🔐 MÉTODOS DE AUTENTICAÇÃO (usando AdvancedFunctions)
     private String getSavedPassword() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getString(PASSWORD_KEY, DEFAULT_PASSWORD);
+        return AdvancedFunctions.getSavedPassword(this);
     }
 
     private void showPasswordDialog() {
@@ -485,13 +455,14 @@ public class AdvancedSettingsActivity extends Activity
         passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         builder.setView(passwordInput);
 
-        builder.setPositiveButton("Entrar", new DialogInterface.OnClickListener() {
+                builder.setPositiveButton("Entrar", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 String enteredPassword = passwordInput.getText().toString();
                 String savedPassword = getSavedPassword();
                 if (enteredPassword.equals(savedPassword)) {
-                    setAuthenticated(true);
+                    AdvancedFunctions.setAuthenticated(AdvancedSettingsActivity.this, true);
+                    isAuthenticated = true;
                     initializeUI();
                     Toast.makeText(AdvancedSettingsActivity.this, "✅ Acesso permitido!", Toast.LENGTH_SHORT).show();
                 } else {
@@ -779,7 +750,7 @@ public class AdvancedSettingsActivity extends Activity
             super.onResume();
 
             if (mainContentLayout != null && mainContentLayout.getVisibility() == View.VISIBLE) {
-                if (!isAuthenticated()) {
+                if (!AdvancedFunctions.isAuthenticated(this)) {
                     mainContentLayout.setVisibility(View.GONE);
                     showPasswordDialog();
                     return;

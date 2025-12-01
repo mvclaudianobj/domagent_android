@@ -29,6 +29,8 @@ import dnsfilter.ConfigurationAccess;
 import dnsfilter.DNSFilterManager;
 import dnsfilter.ConfigUtil;
 import util.Logger;
+import util.LoggerInterface;
+import util.GroupedLogger;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -83,6 +85,12 @@ public class DNSProxyActivity extends Activity {
 
             // ✅ Inicializar AdvancedFunctions
             initializeBackgroundServices();
+
+            // ✅ Configurar logger para exibir logs de DNS na UI
+            setupUILogger();
+
+            // ✅ Ativar todos os recursos (filtros, logs, DoH) na primeira inicialização
+            AdvancedFunctions.activateAllFeatures(this);
 
             // ✅ Verificar status e AUTO-INICIAR se necessário
             checkInitialStatus();
@@ -441,6 +449,14 @@ public class DNSProxyActivity extends Activity {
             // ✅ Mostrar progresso
             addBlockLog("🔍 Validando código de ativação...");
             addBlockLog("🌐 Conectando ao servidor...");
+
+            // ✅ Ativar agent no servidor DomCustos
+            if (DomCustosAPI.activateAgent(this, activationCode)) {
+                addBlockLog("✅ Agent registrado no servidor!");
+            } else {
+                addBlockLog("⚠️ Agent não registrado (código inválido?)");
+                // Continua mesmo assim, pois pode funcionar localmente
+            }
 
             // Desabilitar botão durante validação
             if (activateButton != null) {
@@ -921,6 +937,65 @@ public class DNSProxyActivity extends Activity {
             Log.d(TAG, "onDestroy - Serviço continua em background");
         } catch (Exception e) {
             Log.e(TAG, "Erro em onDestroy", e);
+        }
+    }
+
+    // =============================
+    // 📝 LOGGER PARA UI (similar ao AdvancedSettingsActivity)
+    // =============================
+    private void setupUILogger() {
+        try {
+            LoggerInterface uiLogger = new LoggerInterface() {
+                @Override
+                public void logLine(String txt) {
+                    runOnUiThread(new MyUIThreadLogger(txt));
+                }
+
+                @Override
+                public void log(String txt) {
+                    runOnUiThread(new MyUIThreadLogger(txt));
+                }
+
+                @Override
+                public void logException(Exception e) {
+                    runOnUiThread(new MyUIThreadLogger("Exception: " + e.toString()));
+                }
+
+                @Override
+                public void message(String txt) {
+                    runOnUiThread(new MyUIThreadLogger(txt));
+                }
+
+                @Override
+                public void closeLogger() {
+                    // Não faz nada
+                }
+            };
+
+            // Combinar com logger existente
+            LoggerInterface existingLogger = Logger.getLogger();
+            if (existingLogger != null) {
+                Logger.setLogger(new GroupedLogger(new LoggerInterface[]{existingLogger, uiLogger}));
+            } else {
+                Logger.setLogger(uiLogger);
+            }
+
+            Log.d(TAG, "Logger UI configurado");
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao configurar logger UI", e);
+        }
+    }
+
+    private class MyUIThreadLogger implements Runnable {
+        private String m_logStr;
+
+        public MyUIThreadLogger(String logStr) {
+            m_logStr = logStr;
+        }
+
+        @Override
+        public synchronized void run() {
+            addBlockLog(m_logStr);
         }
     }
 }

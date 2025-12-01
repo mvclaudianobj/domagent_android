@@ -56,6 +56,8 @@ import java.util.zip.ZipOutputStream;
 import javax.net.ssl.HttpsURLConnection;
 
 import dnsfilter.remote.RemoteAccessServer;
+import dnsfilter.android.AndroidEnvironment;
+import dnsfilter.android.DomCustosAPI;
 import util.ExecutionEnvironment;
 import util.FileLogger;
 import util.Logger;
@@ -119,30 +121,7 @@ public class DNSFilterManager extends ConfigurationAccess  {
     private String agentId = null;
     private boolean dohEnabled = false;
 
-    // =============================
-    // 🔐 GERA agent_id CURTO
-    // =============================
-    private String generateShortAgentId() {
-        try {
-            // Usar informações do sistema para gerar ID único
-            String systemInfo = System.getProperty("os.name", "") +
-                    System.getProperty("os.version", "") +
-                    System.getProperty("user.name", "") +
-                    new Date().getTime();
 
-            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(systemInfo.getBytes());
-
-            // Pegar apenas os primeiros 12 bytes para ID curto
-            byte[] shortHash = new byte[12];
-            System.arraycopy(hash, 0, shortHash, 0, 12);
-
-            return Base64.encodeToString(shortHash, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-        } catch (Exception e) {
-            // Fallback: usar timestamp
-            return "agent_" + System.currentTimeMillis();
-        }
-    }
 
     // =============================
     // 📋 VERIFICAÇÃO DE ATIVAÇÃO
@@ -167,13 +146,13 @@ public class DNSFilterManager extends ConfigurationAccess  {
                 Logger.getLogger().logLine("   Agent ID: " + agentId);
 
                 if (agentId == null) {
-                    agentId = generateShortAgentId();
+                    agentId = DomCustosAPI.generateHostID(AndroidEnvironment.getContext());
                     saveAgentPreferences();
                     Logger.getLogger().logLine("   ✅ Novo Agent ID gerado: " + agentId);
                 }
             } else {
                 // Primeira execução - gerar ID mas não ativar
-                agentId = generateShortAgentId();
+                agentId = DomCustosAPI.generateHostID(AndroidEnvironment.getContext());
                 isAgentActivated = false;
                 saveAgentPreferences();
                 Logger.getLogger().logLine("🔍 Primeira execução - Agent ID gerado: " + agentId);
@@ -318,7 +297,7 @@ public class DNSFilterManager extends ConfigurationAccess  {
 
             // ✅ Gerar agent_id se ainda não existe
             if (agentId == null || agentId.isEmpty()) {
-                agentId = generateShortAgentId();
+                agentId = DomCustosAPI.generateHostID(AndroidEnvironment.getContext());
                 Logger.getLogger().logLine("📝 Agent ID gerado: " + agentId);
             }
 
@@ -2043,6 +2022,15 @@ public class DNSFilterManager extends ConfigurationAccess  {
 
             // ✅ VERIFICAR ATIVAÇÃO DO AGENT PRIMEIRO
             checkAgentActivationStatus();
+
+            // ✅ INICIALIZAR API DOMCUSTOS
+            try {
+                // Passar context do AndroidEnvironment
+                dnsfilter.android.DomCustosAPI.initialize(dnsfilter.android.AndroidEnvironment.getContext());
+                Logger.getLogger().logLine("API DomCustos inicializada");
+            } catch (Exception e) {
+                Logger.getLogger().logLine("Erro ao inicializar API DomCustos: " + e.getMessage());
+            }
 
 			byte[] configBytes = readConfig();
 			config = new Properties();

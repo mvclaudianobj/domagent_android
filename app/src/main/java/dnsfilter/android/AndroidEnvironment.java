@@ -75,6 +75,10 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
             WORKDIR = Environment.getExternalStorageDirectory().getAbsolutePath() + "/DomCustosAgent";
     }
 
+    public static Context getContext() {
+        return ctx;
+    }
+
     private void waitForStorage() {
         File dir = null;
 
