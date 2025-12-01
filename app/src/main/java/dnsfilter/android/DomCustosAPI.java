@@ -37,23 +37,20 @@ public class DomCustosAPI {
         public List<String> blockedSites = new ArrayList<>();
     }
 
-    // Salvar agentID em agent_prefs.conf
-    private static void saveAgentIdToPrefs(android.content.Context context, String agentId) throws Exception {
-        File prefsFile = new File(context.getExternalFilesDir(null), "DomCustosAgent/agent_prefs.conf");
-        prefsFile.getParentFile().mkdirs(); // Criar diretório se não existir
+    // Salvar agentID em arquivo externo (persiste entre reinstalações)
+    private static void saveAgentIdToPrefs(android.content.Context context, String agentId) {
+        try {
+            java.io.File agentFile = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "DomCustosAgent/agent.id");
+            agentFile.getParentFile().mkdirs(); // Criar diretório se não existir
 
-        Properties prefs = new Properties();
-        if (prefsFile.exists()) {
-            FileInputStream fis = new FileInputStream(prefsFile);
-            prefs.load(fis);
-            fis.close();
+            java.io.FileWriter writer = new java.io.FileWriter(agentFile);
+            writer.write(agentId);
+            writer.close();
+
+            Log.d(TAG, "AgentID salvo em: " + agentFile.getAbsolutePath());
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao salvar agentID em arquivo externo", e);
         }
-
-        prefs.setProperty("agentId", agentId);
-
-        java.io.FileOutputStream fos = new java.io.FileOutputStream(prefsFile);
-        prefs.store(fos, "DomCustosAgent Preferences");
-        fos.close();
     }
 
     // Gerar agentID usando ANDROID_ID diretamente (único por device)
@@ -76,20 +73,15 @@ public class DomCustosAPI {
     // Inicializar API e agendamento
     public static void initialize(android.content.Context context) {
         try {
-            // Ler agentID de agent_prefs.conf (mesmo arquivo usado por DNSFilterManager)
-            File prefsFile = new File(context.getExternalFilesDir(null), "DomCustosAgent/agent_prefs.conf");
-            Log.d(TAG, "Tentando carregar prefs de: " + prefsFile.getAbsolutePath());
-            Log.d(TAG, "Arquivo prefs existe: " + prefsFile.exists());
-            if (prefsFile.exists()) {
-                Properties prefs = new Properties();
-                FileInputStream fis = new FileInputStream(prefsFile);
-                prefs.load(fis);
-                fis.close();
-                Log.d(TAG, "Conteúdo do prefs: " + prefs.toString());
-                agentID = prefs.getProperty("agent_id", "default_agent");
-                Log.d(TAG, "AgentID carregado de agent_prefs.conf: " + agentID);
+            // Ler agentID de arquivo externo (persiste entre reinstalações)
+            java.io.File agentFile = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "DomCustosAgent/agent.id");
+            if (agentFile.exists()) {
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(agentFile));
+                agentID = reader.readLine();
+                reader.close();
+                Log.d(TAG, "AgentID carregado de arquivo externo: " + agentID);
             } else {
-                Log.w(TAG, "Arquivo agent_prefs.conf não encontrado");
+                Log.w(TAG, "Arquivo agent.id não encontrado");
                 agentID = "default_agent"; // Fallback
             }
 
@@ -102,6 +94,15 @@ public class DomCustosAPI {
                     Logger.getLogger().logLine("Erro ao atualizar regras da API: " + e.getMessage());
                 }
             }, 0, 1, TimeUnit.MINUTES);
+
+            // Agendar heartbeat a cada 90 segundos
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    sendHeartbeat(context);
+                } catch (Exception e) {
+                    Log.e(TAG, "Erro ao enviar heartbeat", e);
+                }
+            }, 0, 90, TimeUnit.SECONDS);
 
             Log.d(TAG, "DomCustosAPI inicializado com agentID: " + agentID);
         } catch (Exception e) {
@@ -342,6 +343,53 @@ public class DomCustosAPI {
     // Verificar se app está bloqueado dinamicamente
     public static boolean isAppBlocked(String app) {
         return dynamicBlockedApps.contains(app.toLowerCase());
+    }
+
+    // Enviar heartbeat para o servidor
+    private static void sendHeartbeat(android.content.Context context) {
+        try {
+            String url = API_BASE_URL + "/agent/heartbeat/" + agentID;
+            HttpsURLConnection conn = null;
+
+            JSONObject data = new JSONObject();
+            data.put("version", "1.0.0"); // Versão do app
+            data.put("os", "android");
+
+            // Tentar obter hostname e IP local
+            try {
+                data.put("hostname", java.net.InetAddress.getLocalHost().getHostName());
+                data.put("last_local_ip", java.net.InetAddress.getLocalHost().getHostAddress());
+            } catch (Exception e) {
+                data.put("hostname", "unknown");
+                data.put("last_local_ip", "unknown");
+            }
+
+            String jsonData = data.toString();
+
+            URL apiUrl = new URL(url);
+            conn = (HttpsURLConnection) apiUrl.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(TIMEOUT_MS);
+            conn.setReadTimeout(TIMEOUT_MS);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            OutputStream os = conn.getOutputStream();
+            os.write(jsonData.getBytes("UTF-8"));
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != 200) {
+                Log.w(TAG, "Heartbeat falhou, status: " + responseCode);
+            } else {
+                Log.d(TAG, "Heartbeat enviado com sucesso");
+            }
+
+            conn.disconnect();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao enviar heartbeat", e);
+        }
     }
 
     // Obter agentID

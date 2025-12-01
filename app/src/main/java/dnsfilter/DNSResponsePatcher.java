@@ -209,14 +209,15 @@ public class DNSResponsePatcher {
 		if (dynamicBlock) {
 			result = true; // Forçar bloqueio se na lista dinâmica
 			Logger.getLogger().logLine("FILTERED (API):" + host);
-		}
-
-		if (result == true) {
-			Logger.getLogger().logLine("FILTERED:" + host);
-			dnsfilter.android.DomCustosAPI.logActivity("filtered", host, "DNS blocked");
+			dnsfilter.android.DomCustosAPI.logActivity("doh_blocked_agent_rule", host, "DoH - Bloqueado");
 		} else {
-			Logger.getLogger().logLine("ALLOWED:" + host);
-			dnsfilter.android.DomCustosAPI.logActivity("allowed", host, "DNS allowed");
+			if (result == true) {
+				Logger.getLogger().logLine("FILTERED:" + host);
+				dnsfilter.android.DomCustosAPI.logActivity("filtered", host, "DNS blocked");
+			} else {
+				Logger.getLogger().logLine("ALLOWED:" + host);
+				dnsfilter.android.DomCustosAPI.logActivity("allowed", host, "DNS allowed");
+			}
 		}
 
 		if (result == false)
