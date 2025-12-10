@@ -61,22 +61,15 @@ public class DNSFilterTileService extends TileService {
                 updateTile();
             } else {
                 // Service isn't running, we need to start it
-                if (Build.VERSION.SDK_INT < 34) {
-                    Intent startIntent = new Intent(this, DNSProxyActivity.class);
-                    startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivityAndCollapse(startIntent);
-                } else {
-                    Intent startIntent = new Intent(this, DNSProxyActivity.class);
-                    startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivityAndCollapse(
-                            PendingIntent.getActivity(
-                                    this,
-                                    0,
-                                    startIntent,
-                                    PendingIntent.FLAG_IMMUTABLE
-                            )
-                    );
-                }
+                Intent startIntent = new Intent(this, DNSProxyActivity.class);
+                startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                PendingIntent pendingIntent = PendingIntent.getActivity(
+                        this,
+                        0,
+                        startIntent,
+                        PendingIntent.FLAG_IMMUTABLE
+                );
+                startActivityAndCollapse(pendingIntent);
             }
         } catch (IOException e) {
             Logger.getLogger().logLine("Error toggling DNS filtering state: " + e.getMessage());

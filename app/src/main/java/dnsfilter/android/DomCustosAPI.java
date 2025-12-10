@@ -18,6 +18,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import javax.net.ssl.HttpsURLConnection;
 import android.provider.Settings;
+import android.location.Location;
+import android.location.LocationManager;
 import dnsfilter.BlockedHosts;
 import dnsfilter.ConfigurationAccess;
 import dnsfilter.ConfigUtil;
@@ -345,6 +347,27 @@ public class DomCustosAPI {
         return dynamicBlockedApps.contains(app.toLowerCase());
     }
 
+    // Obter localização atual
+    private static Location getCurrentLocation(android.content.Context context) {
+        try {
+            LocationManager locationManager = (LocationManager) context.getSystemService(android.content.Context.LOCATION_SERVICE);
+            if (locationManager != null) {
+                // Tentar GPS primeiro
+                Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (location == null) {
+                    // Fallback para network
+                    location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                }
+                return location;
+            }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Permissão de localização não concedida", e);
+        } catch (Exception e) {
+            Log.w(TAG, "Erro ao obter localização", e);
+        }
+        return null;
+    }
+
     // Enviar heartbeat para o servidor
     private static void sendHeartbeat(android.content.Context context) {
         try {
@@ -362,6 +385,18 @@ public class DomCustosAPI {
             } catch (Exception e) {
                 data.put("hostname", "unknown");
                 data.put("last_local_ip", "unknown");
+            }
+
+            // Obter localização
+            Location location = getCurrentLocation(context);
+            if (location != null) {
+                data.put("latitude", location.getLatitude());
+                data.put("longitude", location.getLongitude());
+                Log.d(TAG, "Localização incluída no heartbeat: " + location.getLatitude() + ", " + location.getLongitude());
+            } else {
+                data.put("latitude", JSONObject.NULL);
+                data.put("longitude", JSONObject.NULL);
+                Log.d(TAG, "Localização não disponível para heartbeat");
             }
 
             String jsonData = data.toString();
