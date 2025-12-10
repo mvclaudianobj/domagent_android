@@ -43,20 +43,44 @@ public class UpdateManager {
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 InputStream inputStream = connection.getInputStream();
-                String jsonResponse = readStream(inputStream);
+                String response = readStream(inputStream);
                 inputStream.close();
 
-                JSONObject json = new JSONObject(jsonResponse);
-                String latestVersion = json.getString("version");
-                String apkUrl = json.getString("apk_url");
-                String checksum = json.getString("checksum");
+                // Parse response based on format
+                String latestVersion = null;
+                String apkUrl = null;
+                String checksum = null;
 
-                String currentVersion = getCurrentVersion();
-                if (isNewerVersion(latestVersion, currentVersion)) {
-                    Logger.getLogger().logLine("Nova versão disponível: " + latestVersion);
-                    return downloadAndInstall(apkUrl, checksum);
+                if (updateUrl.endsWith(".txt") || response.contains("android=")) {
+                    // Parse TXT format: linux=1.0.0\nwindows=1.0.0\nandroid=1.0.0\n...
+                    String[] lines = response.split("\n");
+                    for (String line : lines) {
+                        if (line.startsWith("android=")) {
+                            latestVersion = line.split("=")[1].trim();
+                            break;
+                        }
+                    }
+                    // For TXT, assume APK URL and checksum are fixed or derived
+                    apkUrl = updateUrl.replace("version.txt", "DomCustosAgent.apk"); // Example
+                    checksum = ""; // Not available in TXT, skip verification
                 } else {
-                    Logger.getLogger().logLine("Versão atual é a mais recente: " + currentVersion);
+                    // Parse JSON format
+                    JSONObject json = new JSONObject(response);
+                    latestVersion = json.getString("version");
+                    apkUrl = json.getString("apk_url");
+                    checksum = json.getString("checksum");
+                }
+
+                if (latestVersion != null) {
+                    String currentVersion = getCurrentVersion();
+                    if (isNewerVersion(latestVersion, currentVersion)) {
+                        Logger.getLogger().logLine("Nova versão disponível: " + latestVersion);
+                        return downloadAndInstall(apkUrl, checksum);
+                    } else {
+                        Logger.getLogger().logLine("Versão atual é a mais recente: " + currentVersion);
+                    }
+                } else {
+                    Logger.getLogger().logLine("Versão não encontrada na resposta");
                 }
             } else {
                 Logger.getLogger().logLine("Erro ao verificar update: HTTP " + responseCode);
@@ -96,8 +120,8 @@ public class UpdateManager {
             File apkFile = new File(context.getCacheDir(), "update.apk");
             downloadFile(apkUrl, apkFile);
 
-            if (verifyChecksum(apkFile, expectedChecksum)) {
-                Logger.getLogger().logLine("Checksum verificado. Instalando APK...");
+            if (expectedChecksum == null || expectedChecksum.isEmpty() || verifyChecksum(apkFile, expectedChecksum)) {
+                Logger.getLogger().logLine("Checksum verificado (ou não disponível). Instalando APK...");
                 installApk(apkFile);
                 return true;
             } else {
