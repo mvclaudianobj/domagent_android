@@ -104,6 +104,7 @@ public class AdvancedSettingsActivity extends Activity
 
     protected Button startBtn;
     protected Button stopBtn;
+    protected Button forceUpdateBtn;
     protected Button reloadFilterBtn;
     protected Button remoteCtrlBtn;
     protected Button helpBtn;
@@ -554,6 +555,8 @@ public class AdvancedSettingsActivity extends Activity
         startBtn.setOnClickListener(this);
         stopBtn = (Button) findViewById(R.id.stopBtn);
         stopBtn.setOnClickListener(this);
+        forceUpdateBtn = (Button) findViewById(R.id.forceUpdateBtn);
+        forceUpdateBtn.setOnClickListener(this);
         reloadFilterBtn = (Button) findViewById(R.id.filterReloadBtn);
         reloadFilterBtn.setOnClickListener(this);
         helpBtn = (Button) findViewById(R.id.helpBtn);
@@ -1342,6 +1345,10 @@ public class AdvancedSettingsActivity extends Activity
             handlefilterReload();
         }
 
+        if (destination == forceUpdateBtn) {
+            forceUpdate();
+        }
+
         if (destination == advancedConfigCheck || destination == editAdditionalHostsCheck ||
                 destination == manuallyEditConfChk || destination == editFilterLoadCheck ||
                 destination == appWhiteListCheck || destination == backupRestoreCheck) {
@@ -2062,5 +2069,41 @@ public class AdvancedSettingsActivity extends Activity
         } catch (IOException e) {
             Logger.getLogger().logLine("releaseWakeLock failed! " + e);
         }
+    }
+
+    private void forceUpdate() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String updateUrl = CONFIG.getConfig().getProperty("updateUrl", "https://files.domcustos.com.br/updates/version.txt");
+                    UpdateManager updateManager = new UpdateManager(AdvancedSettingsActivity.this);
+                    boolean updated = updateManager.checkForUpdate(updateUrl);
+                    if (updated) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                message("Update forçado com sucesso! Reinicie o app se necessário.");
+                            }
+                        });
+                    } else {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                message("Nenhuma atualização disponível ou falha no download.");
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Logger.getLogger().logException(e);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            message("Erro ao forçar update: " + e.getMessage());
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 }
