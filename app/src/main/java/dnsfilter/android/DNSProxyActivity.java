@@ -696,14 +696,14 @@ public class DNSProxyActivity extends Activity {
     // ✅ VALIDAÇÃO DE ATIVAÇÃO ANTES DE ABRIR CONFIGURAÇÕES AVANÇADAS
     private void openAdvancedSettings() {
         try {
-            // ✅ Verificar se o agente está ativado
-            if (!dnsManager.isAgentActivated()) {
-                addBlockLog("⚠️ Configurações avançadas requerem ativação");
-                Toast.makeText(this,
-                        "🔒 Ative o agente primeiro para acessar configurações avançadas",
-                        Toast.LENGTH_LONG).show();
-                return;
-            }
+            // ✅ TEMPORARIAMENTE REMOVIDO PARA DEBUG: Verificar se o agente está ativado
+            // if (!dnsManager.isAgentActivated()) {
+            //     addBlockLog("⚠️ Configurações avançadas requerem ativação");
+            //     Toast.makeText(this,
+            //             "🔒 Ative o agente primeiro para acessar configurações avançadas",
+            //             Toast.LENGTH_LONG).show();
+            //     return;
+            // }
 
             addBlockLog("⚙️ Abrindo configurações avançadas...");
 
