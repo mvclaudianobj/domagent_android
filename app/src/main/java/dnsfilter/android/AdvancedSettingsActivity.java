@@ -386,17 +386,17 @@ public class AdvancedSettingsActivity extends Activity
                 System.exit(0);
             }
 
-            // ✅ Verificar se o agente está ativado
-            DNSFilterManager dnsManager = DNSFilterManager.getInstance();
-            if (!dnsManager.isAgentActivated()) {
-                Logger.getLogger().logLine("⚠️ Agente não ativado - redirecionando...");
-                Toast.makeText(this, "Por favor, ative o agente na tela principal", Toast.LENGTH_LONG).show();
-                Intent intent = new Intent(this, DNSProxyActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-                finish();
-                return;
-            }
+            // ✅ TEMPORARIAMENTE REMOVIDO PARA DEBUG: Verificar se o agente está ativado
+            // DNSFilterManager dnsManager = DNSFilterManager.getInstance();
+            // if (!dnsManager.isAgentActivated()) {
+            //     Logger.getLogger().logLine("⚠️ Agente não ativado - redirecionando...");
+            //     Toast.makeText(this, "Por favor, ative o agente na tela principal", Toast.LENGTH_LONG).show();
+            //     Intent intent = new Intent(this, DNSProxyActivity.class);
+            //     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            //     startActivity(intent);
+            //     finish();
+            //     return;
+            // }
 
             DISPLAY_WIDTH = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getWidth();
             DISPLAY_HEIGTH = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getHeight();
