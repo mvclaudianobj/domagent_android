@@ -419,12 +419,12 @@ public class AdvancedSettingsActivity extends Activity
                 mainContentLayout.setVisibility(View.GONE);
             }
 
-            // ✅ VERIFICAR AUTENTICAÇÃO
-            if (!AdvancedFunctions.isAuthenticated(this)) {
-                showPasswordDialog();
-            } else {
+            // ✅ TEMPORARIAMENTE REMOVIDO PARA DEBUG: VERIFICAR AUTENTICAÇÃO
+            // if (!AdvancedFunctions.isAuthenticated(this)) {
+            //     showPasswordDialog();
+            // } else {
                 initializeUI();
-            }
+            // }
 
         } catch (Exception e) {
             dump(e);
