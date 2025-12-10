@@ -21,12 +21,16 @@ public class UpdateService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Logger.getLogger().logLine("UpdateService iniciado");
 
-        // Agendar check periódico se não estiver agendado
-        scheduleUpdateCheck();
+        try {
+            // Agendar check periódico se não estiver agendado
+            scheduleUpdateCheck();
 
-        // Executar check imediato se solicitado
-        if (intent != null && "CHECK_NOW".equals(intent.getAction())) {
-            performUpdateCheck();
+            // Executar check imediato se solicitado
+            if (intent != null && "CHECK_NOW".equals(intent.getAction())) {
+                performUpdateCheck();
+            }
+        } catch (Exception e) {
+            Logger.getLogger().logException(e);
         }
 
         return START_STICKY;
@@ -50,7 +54,8 @@ public class UpdateService extends Service {
 
     private void performUpdateCheck() {
         try {
-            String updateUrl = DNSFilterManager.getInstance().getConfig().getProperty("updateUrl", "https://domcustos.com.br/agent/update.json");
+            Logger.getLogger().logLine("Executando check de update");
+            String updateUrl = DNSFilterManager.getInstance().getConfig().getProperty("updateUrl", "https://files.domcustos.com.br/updates/version.txt");
             UpdateManager updateManager = new UpdateManager(this);
             updateManager.checkForUpdate(updateUrl);
         } catch (Exception e) {

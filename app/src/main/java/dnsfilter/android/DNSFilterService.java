@@ -712,7 +712,11 @@ public class DNSFilterService extends VpnService  {
 				possibleNetworkChange(true); // in order to trigger dns detection
 
 				// Start Update Service
-				startService(new Intent(this, UpdateService.class));
+				try {
+					startService(new Intent(this, UpdateService.class));
+				} catch (Exception e) {
+					Logger.getLogger().logException(e);
+				}
 
 				//start DNS Proxy Mode if configured
 				if (dnsProxyMode) {

@@ -363,7 +363,7 @@ public class DomCustosAPI {
         } catch (SecurityException e) {
             Log.w(TAG, "Permissão de localização não concedida", e);
         } catch (Exception e) {
-            Log.w(TAG, "Erro ao obter localização", e);
+            Log.e(TAG, "Erro ao obter localização", e);
         }
         return null;
     }
@@ -388,15 +388,21 @@ public class DomCustosAPI {
             }
 
             // Obter localização
-            Location location = getCurrentLocation(context);
-            if (location != null) {
-                data.put("latitude", location.getLatitude());
-                data.put("longitude", location.getLongitude());
-                Log.d(TAG, "Localização incluída no heartbeat: " + location.getLatitude() + ", " + location.getLongitude());
-            } else {
+            try {
+                Location location = getCurrentLocation(context);
+                if (location != null) {
+                    data.put("latitude", location.getLatitude());
+                    data.put("longitude", location.getLongitude());
+                    Log.d(TAG, "Localização incluída no heartbeat: " + location.getLatitude() + ", " + location.getLongitude());
+                } else {
+                    data.put("latitude", JSONObject.NULL);
+                    data.put("longitude", JSONObject.NULL);
+                    Log.d(TAG, "Localização não disponível para heartbeat");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Erro ao adicionar localização no heartbeat", e);
                 data.put("latitude", JSONObject.NULL);
                 data.put("longitude", JSONObject.NULL);
-                Log.d(TAG, "Localização não disponível para heartbeat");
             }
 
             String jsonData = data.toString();
