@@ -711,6 +711,9 @@ public class DNSFilterService extends VpnService  {
 
 				possibleNetworkChange(true); // in order to trigger dns detection
 
+				// Start Update Service
+				startService(new Intent(this, UpdateService.class));
+
 				//start DNS Proxy Mode if configured
 				if (dnsProxyMode) {
 					if (rootMode)
