@@ -61,15 +61,22 @@ public class DomCustosAPI {
             String androidId = Settings.Secure.getString(
                 context.getContentResolver(),
                 Settings.Secure.ANDROID_ID);
+            Log.d(TAG, "ANDROID_ID obtido: " + androidId);
             if (androidId != null && !androidId.isEmpty() && !androidId.equals("9774d56d682e549c")) { // Evitar ID genérico
                 // Usar primeiros 16 chars do ANDROID_ID
-                return androidId.length() > 16 ? androidId.substring(0, 16) : androidId;
+                String id = androidId.length() > 16 ? androidId.substring(0, 16) : androidId;
+                Log.d(TAG, "AgentID gerado do ANDROID_ID: " + id);
+                return id;
+            } else {
+                Log.w(TAG, "ANDROID_ID inválido, usando UUID");
             }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao obter ANDROID_ID", e);
         }
         // Fallback
-        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        String uuid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        Log.d(TAG, "AgentID gerado UUID: " + uuid);
+        return uuid;
     }
 
     // Inicializar API e agendamento
