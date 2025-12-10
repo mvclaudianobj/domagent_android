@@ -185,10 +185,10 @@ public class DomCustosAPI {
                 ConfigUtil configUtil = ConfigurationAccess.getLocal().getConfigUtil();
                 String savedID = configUtil.getConfigValue("agentID", "default_agent");
                 if ("default_agent".equals(savedID)) {
-                agentID = generateHostID(context);
-                // Salvar em agent_prefs.conf (mesmo arquivo usado por DNSFilterManager)
-                saveAgentIdToPrefs(context, agentID);
-                Log.d(TAG, "AgentID gerado para ativação: " + agentID);
+                    agentID = generateHostID(context);
+                    // Salvar em agent_prefs.conf (mesmo arquivo usado por DNSFilterManager)
+                    saveAgentIdToPrefs(context, agentID);
+                    Log.d(TAG, "AgentID gerado para ativação: " + agentID);
                 } else {
                     agentID = savedID;
                 }
@@ -205,6 +205,7 @@ public class DomCustosAPI {
             Log.d(TAG, "Enviando activate com agentID: " + agentID + ", os_type: android");
 
             String jsonData = data.toString();
+            Log.d(TAG, "Enviando JSON: " + jsonData);
 
             URL apiUrl = new URL(url);
             conn = (HttpsURLConnection) apiUrl.openConnection();
@@ -228,7 +229,7 @@ public class DomCustosAPI {
             }
             reader.close();
 
-            Log.d(TAG, "Resposta do servidor: " + responseCode + " - " + response.toString());
+            Log.d(TAG, "Resposta do servidor activate: " + responseCode + " - " + response.toString());
 
             if (responseCode == 200) {
             // Parse agent_id retornado pelo servidor
