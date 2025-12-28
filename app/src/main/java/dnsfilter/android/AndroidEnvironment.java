@@ -53,6 +53,17 @@ public class AndroidEnvironment implements ExecutionEnvironmentInterface {
         ExecutionEnvironment.setEnvironment(INSTANCE);
     }
 
+  /*  public static void installSecurityProvider(Context context) {
+        try {
+            // Dynamically updates the device's security provider
+            ProviderInstaller.installIfNeeded(context);
+            Log.i("SecurityProvider", "Dynamic Security Provider installed successfully.");
+        } catch (GooglePlayServicesRepairableException e) {
+            Log.e("SecurityProvider", "Google Play Services needs repair: " + e);
+        } catch (GooglePlayServicesNotAvailableException e) {
+            Log.e("SecurityProvider", "Google Play Services not available: " + e);
+        }
+    }*/
 
     public static void initEnvironment(Context context) {
         ctx = context;

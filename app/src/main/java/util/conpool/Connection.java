@@ -63,6 +63,7 @@ public class Connection implements TimeoutListener {
 	boolean acquired = true;
 	boolean valid = true;
 	boolean ssl = false;
+	boolean doh2 = false;
 	private InetSocketAddress sadr;
 	private int conTimeout;
 	private SSLSocketFactory sslSocketFactory;
@@ -76,7 +77,7 @@ public class Connection implements TimeoutListener {
 	private static int  POOLTIMEOUT_SECONDS = 300;	
 	private static TimoutNotificator toNotify = TimoutNotificator.getNewInstance();
 
-	private Connection(String host, int port, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {		
+	private Connection(String host, int port, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy, boolean doh2) throws IOException {
 		InetAddress adr=null;
 		
 		if (CUSTOM_HOSTS != null)
@@ -88,22 +89,22 @@ public class Connection implements TimeoutListener {
 				adr = InetAddress.getByAddress(host, NO_IP);
 			
 		InetSocketAddress sadr = new InetSocketAddress(adr,port);
-		poolKey = poolKey(host,port,ssl,proxy);
-		initConnection(sadr,conTimeout, ssl,sslSocketFactory, proxy);	
+		poolKey = poolKey(host,port,ssl,proxy, doh2);
+		initConnection(sadr,conTimeout, ssl,sslSocketFactory, proxy, doh2);
 		timeout = new TimeoutTime(toNotify);		
 	}
 
-	private Connection(InetSocketAddress sadr, int conTimeout, boolean ssl,SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {
-		poolKey = poolKey(sadr.getAddress().getHostAddress(),sadr.getPort(), ssl, proxy);
-		initConnection(sadr,conTimeout, ssl, sslSocketFactory, proxy);		
+	private Connection(InetSocketAddress sadr, int conTimeout, boolean ssl,SSLSocketFactory sslSocketFactory, Proxy proxy, boolean doh2) throws IOException {
+		poolKey = poolKey(sadr.getAddress().getHostAddress(),sadr.getPort(), ssl, proxy, doh2);
+		initConnection(sadr,conTimeout, ssl, sslSocketFactory, proxy, doh2);
 		timeout = new TimeoutTime(toNotify);		
 	}
 	
-	public static Connection connect(InetSocketAddress sadr, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {
+	public static Connection connect(InetSocketAddress sadr, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy, boolean doh2) throws IOException {
 
-		Connection con = poolRemove(poolKey(sadr.getAddress().getHostAddress(), sadr.getPort(), ssl, proxy));
+		Connection con = poolRemove(poolKey(sadr.getAddress().getHostAddress(), sadr.getPort(), ssl, proxy, doh2));
 		if (con == null) {	
-			con = new Connection(sadr,conTimeout, ssl, sslSocketFactory, proxy);
+			con = new Connection(sadr,conTimeout, ssl, sslSocketFactory, proxy, doh2);
 		}		
 		con.initStreams();
 		synchronized(connAcquired) {
@@ -113,7 +114,7 @@ public class Connection implements TimeoutListener {
 	}
 	
 	public static Connection connect(InetSocketAddress sadr, int conTimeout) throws IOException {
-		return connect(sadr, conTimeout, false, null, Proxy.NO_PROXY);
+		return connect(sadr, conTimeout, false, null, Proxy.NO_PROXY, false);
 	}
 	
 	public static Connection connect(InetSocketAddress address)	throws IOException {
@@ -122,9 +123,9 @@ public class Connection implements TimeoutListener {
 	
 	public static Connection connect(String host, int port, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {
 
-		Connection con = poolRemove(poolKey(host, port, ssl, proxy));
+		Connection con = poolRemove(poolKey(host, port, ssl, proxy,false));
 		if (con == null) {			
-			con = new Connection(host, port, conTimeout, ssl, sslSocketFactory, proxy);		
+			con = new Connection(host, port, conTimeout, ssl, sslSocketFactory, proxy, false);
 		}		
 		con.initStreams();
 		synchronized(connAcquired) {
@@ -142,9 +143,9 @@ public class Connection implements TimeoutListener {
 	}
 	
 	
-	private static String poolKey (String host, int port, boolean ssl, Proxy proxy) {
+	private static String poolKey (String host, int port, boolean ssl, Proxy proxy, boolean doh2) {
 		if (ssl)
-			return host+":"+port+":"+"ssl:"+proxy.hashCode();
+			return host+":"+port+":"+"ssl:"+proxy.hashCode()+":"+doh2;
 		else 
 			return host+":"+port+":"+"plain:"+proxy.hashCode();
 	}
@@ -201,13 +202,14 @@ public class Connection implements TimeoutListener {
 		
 	}
 
-	private void initConnection(InetSocketAddress sadr, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {
+	private void initConnection(InetSocketAddress sadr, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy, boolean doh2) throws IOException {
 
 		this.sadr = sadr;
 		this.conTimeout = conTimeout;
 		this.ssl = ssl;
 		this.sslSocketFactory = sslSocketFactory;
 		this.proxy = proxy;
+		this.doh2 = doh2;
 		establishConnection();
 	}
 

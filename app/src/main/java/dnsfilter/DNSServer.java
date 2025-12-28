@@ -21,6 +21,8 @@ package dnsfilter;
    Contact:i.z@gmx.net
  */
 
+import static java.lang.System.in;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -42,6 +44,7 @@ import util.ExecutionEnvironment;
 import util.Logger;
 import util.conpool.Connection;
 import util.conpool.HttpProxy;
+import util.http.DOHHttp2Util;
 import util.http.HttpChunkedInputStream;
 import util.http.HttpHeader;
 
@@ -57,11 +60,19 @@ public class DNSServer {
     public static final int DOT = 2; // DNS over TLS
     public static final int DOH = 3; // DNS of HTTPS
 
+    static int ANDROID_VERSION = -1;
+
     private static DNSServer INSTANCE = new DNSServer(null,0,0);
 
     protected static Proxy proxy = Proxy.NO_PROXY;
 
-
+    private static int getAndroidVersion() {
+        if (ANDROID_VERSION != -1)
+            return  (ANDROID_VERSION);
+        else if (ExecutionEnvironment.getEnvironment().getEnvironmentID() == 1) //Android Environment
+            ANDROID_VERSION = Integer.parseInt(ExecutionEnvironment.getEnvironment().getEnvironmentVersion());
+        return ANDROID_VERSION;
+    }
     private class DNSServerConfig extends Object {
         int protocol;
         String ip;
@@ -242,7 +253,12 @@ public class DNSServer {
             case UDP: return new UDP(address, port, timeout);
             case TCP: return new TCP(address, port, timeout, false, endPoint);
             case DOT: return new TCP(address, port, timeout,true, endPoint);
-            case DOH: return new DoH(address, port, timeout, endPoint);
+            case DOH: {
+                if (ExecutionEnvironment.getEnvironment().getEnvironmentID() == 0 || getAndroidVersion() >= 29)
+                    //on native Java or Android Version 29 and higher use DOH on http/2
+                    return new DoH2(address, port, timeout, endPoint);
+                else return new DoH(address, port, timeout, endPoint);
+            }
             default: throw new IllegalArgumentException("Invalid protocol:"+protocol);
         }
     }
@@ -560,7 +576,7 @@ class TCP extends DNSServer {
     @Override
     public void resolve(DatagramPacket request, DatagramPacket response) throws IOException {
 
-        Connection con = Connection.connect(address, timeout, ssl, null, proxy);
+        Connection con = Connection.connect(address, timeout, ssl, null, proxy, false);
         for (int i = 0; i < 2; i++) { //retry once in case of EOFException (pooled connection was already closed)
             con.setSoTimeout(timeout);
             try {
@@ -600,33 +616,35 @@ class DoH extends DNSServer {
     protected DoH(InetAddress address, int port, int timeout, String url) throws IOException {
         super(address, port, timeout);
 
-        if (url== null)
-            throw new IOException ("Endpoint URL not defined for DNS over HTTPS (DoH)!");
+        if (url == null)
+            throw new IOException("Endpoint URL not defined for DNS over HTTPS (DoH)!");
 
-        this.url= url;
+        this.url = url;
         buildTemplate();
         urlHostAddress = new InetSocketAddress(InetAddress.getByAddress(urlHost, address.getAddress()), port);
     }
 
     @Override
-    public String getProtocolName(){return "DOH";}
+    public String getProtocolName() {
+        return "DOH";
+    }
 
     private void buildTemplate() throws IOException {
-        String user_agent= "Mozilla/5.0 ("+System.getProperty("os.name")+"; "+System.getProperty("os.version")+")";
+        String user_agent = "Mozilla/5.0 (" + System.getProperty("os.name") + "; " + System.getProperty("os.version") + ")";
         HttpHeader REQ_TEMPLATE = new HttpHeader(HttpHeader.REQUEST_HEADER);
         REQ_TEMPLATE.setValue("User-Agent", user_agent);
         REQ_TEMPLATE.setValue("Accept", "application/dns-message");
         REQ_TEMPLATE.setValue("content-type", "application/dns-message");
         REQ_TEMPLATE.setValue("Connection", "keep-alive");
-        REQ_TEMPLATE.setRequest("POST "+url+" "+"HTTP/1.1");
-        REQ_TEMPLATE.setValue("Content-Length","999");
+        REQ_TEMPLATE.setRequest("POST " + url + " " + "HTTP/1.1");
+        REQ_TEMPLATE.setValue("Content-Length", "999");
 
         reqTemplate = REQ_TEMPLATE.getServerRequestHeader(false);
         urlHost = REQ_TEMPLATE.remote_host_name;
     }
 
     private byte[] buildRequestHeader(int length) throws IOException {
-       return reqTemplate.replace("\nContent-Length: 999","\nContent-Length: "+length).getBytes();
+        return reqTemplate.replace("\nContent-Length: 999", "\nContent-Length: " + length).getBytes();
     }
 
     @Override
@@ -634,10 +652,10 @@ class DoH extends DNSServer {
 
         byte[] reqHeader = buildRequestHeader(request.getLength());
 
-        Connection con = Connection.connect(urlHostAddress, timeout, true, null, proxy);
+        Connection con = Connection.connect(urlHostAddress, timeout, true, null, proxy, false);
         con.setSoTimeout(timeout);
 
-        for (int i = 0; i<2; i++) { //retry once in case of EOFException (pooled connection was already closed)
+        for (int i = 0; i < 2; i++) { //retry once in case of EOFException (pooled connection was already closed)
 
             try {
                 OutputStream out = con.getOutputStream();
@@ -665,12 +683,12 @@ class DoH extends DNSServer {
                     size = 0;
                     byte[] buf = new byte[maxBufSize];
 
-                    while ( (r = in.read(buf, size, buf.length-size)) != -1) {
+                    while ((r = in.read(buf, size, buf.length - size)) != -1) {
                         size = size + r;
                         if (size == maxBufSize)
                             throw new IOException("Buffer to small!");
                     }
-                    in = new ByteArrayInputStream(buf,0, size);
+                    in = new ByteArrayInputStream(buf, 0, size);
                 }
                 readResponseFromStream(new DataInputStream(in), size, response);
                 response.setSocketAddress(address);
@@ -691,5 +709,63 @@ class DoH extends DNSServer {
         }
     }
 }
+
+class DoH2 extends DNSServer {
+    String url;
+    String urlHost;
+    String reqTemplate;
+    InetSocketAddress urlHostAddress;
+
+    protected DoH2(InetAddress address, int port, int timeout, String url) throws IOException {
+        super(address, port, timeout);
+
+        if (url == null)
+            throw new IOException("Endpoint URL not defined for DNS over HTTPS (DoH)!");
+
+        this.url = url;
+        buildTemplate();
+        urlHostAddress = new InetSocketAddress(InetAddress.getByAddress(urlHost, address.getAddress()), port);
+    }
+
+    @Override
+    public String getProtocolName() {
+        return "DOH";
+    }
+
+    private void buildTemplate() throws IOException {
+        String user_agent = "Mozilla/5.0 (" + System.getProperty("os.name") + "; " + System.getProperty("os.version") + ")";
+        HttpHeader REQ_TEMPLATE = new HttpHeader(HttpHeader.REQUEST_HEADER);
+        REQ_TEMPLATE.setValue("User-Agent", user_agent);
+        REQ_TEMPLATE.setValue("Accept", "application/dns-message");
+        REQ_TEMPLATE.setValue("content-type", "application/dns-message");
+        REQ_TEMPLATE.setValue("Connection", "keep-alive");
+        REQ_TEMPLATE.setRequest("POST " + url + " " + "HTTP/1.1");
+        REQ_TEMPLATE.setValue("Content-Length", "999");
+
+        reqTemplate = REQ_TEMPLATE.getServerRequestHeader(false);
+        urlHost = REQ_TEMPLATE.remote_host_name;
+    }
+
+    private byte[] buildRequestHeader(int length) throws IOException {
+        return reqTemplate.replace("\nContent-Length: 999", "\nContent-Length: " + length).getBytes();
+    }
+
+    @Override
+    public void resolve(DatagramPacket request, DatagramPacket response) throws IOException {
+        try {
+            byte[] dnsReply = new byte[0];
+            dnsReply = DOHHttp2Util.sendDnsQuery(urlHostAddress, request.getData(), request.getOffset(), request.getLength(), timeout);
+            readResponseFromStream(new DataInputStream(new ByteArrayInputStream(dnsReply)), dnsReply.length, response);
+        } catch (Exception e) {
+            //Logger.getLogger().logException(e);
+            throw new IOException(e);
+        }
+
+    }
+
+
+
+}
+
 
 
