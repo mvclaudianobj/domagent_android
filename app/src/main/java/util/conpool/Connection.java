@@ -23,6 +23,7 @@
 
 package util.conpool;
 
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,12 +47,14 @@ import java.util.Vector;
 import javax.net.ssl.SSLSocketFactory;
 
 import util.ExecutionEnvironment;
+import util.Logger;
 import util.TimeoutListener;
 import util.TimeoutTime;
 import util.TimoutNotificator;
+import util.http.DOHHttp2Util;
 
 
-public class Connection implements TimeoutListener {
+ public class Connection implements TimeoutListener {
 
 	private Socket socket = null;
 	private InputStream socketIn;
@@ -68,6 +71,9 @@ public class Connection implements TimeoutListener {
 	private int conTimeout;
 	private SSLSocketFactory sslSocketFactory;
 	private Proxy proxy;
+	private int http2StreamID = 1;
+
+	private static int maxHttp2StreamID = 2147483647;
 
 	private static byte[] NO_IP = new byte[]{0,0,0,0};
 	private static HashMap connPooled = new HashMap();
@@ -124,6 +130,7 @@ public class Connection implements TimeoutListener {
 	public static Connection connect(String host, int port, int conTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, Proxy proxy) throws IOException {
 
 		Connection con = poolRemove(poolKey(host, port, ssl, proxy,false));
+
 		if (con == null) {			
 			con = new Connection(host, port, conTimeout, ssl, sslSocketFactory, proxy, false);
 		}		
@@ -235,30 +242,40 @@ public class Connection implements TimeoutListener {
 
 	private void establishConnection() throws IOException {
 		
-		if (conTimeout <0)
-			conTimeout= 0;
-		
-		if (proxy == Proxy.NO_PROXY) {
-			socket = SocketChannel.open().socket();
-			ExecutionEnvironment.getEnvironment().protectSocket(socket,0);
-			socket.connect(sadr,conTimeout);
+		if (conTimeout < 0)
+			conTimeout = 0;
+
+		if (doh2) {
+			socket = establishDOH2Connection();
 		} else {
-			if (! (proxy instanceof HttpProxy))
-				throw new IOException ("Only "+HttpProxy.class.getName() +" supported for creating connection over tunnel!");
-			socket = ((HttpProxy) proxy).openTunnel(sadr, conTimeout, true);
-		}
-		//Logger.getLogger().logLine("NEW CONNECTION TO:"+socket);
-		if (ssl) {
-			socket.setSoTimeout(conTimeout); // avoid endless hang in SSL Handshake
-			if (sslSocketFactory==null)
-				sslSocketFactory= getDefaultSSLSocketFactory();
-			socket = sslSocketFactory.createSocket(socket, sadr.getHostName(), sadr.getPort(), true);
-			this.ssl = true;
+
+			if (proxy == Proxy.NO_PROXY) {
+				socket = SocketChannel.open().socket();
+				ExecutionEnvironment.getEnvironment().protectSocket(socket, 0);
+				socket.connect(sadr, conTimeout);
+			} else {
+				if (!(proxy instanceof HttpProxy))
+					throw new IOException("Only " + HttpProxy.class.getName() + " supported for creating connection over tunnel!");
+				socket = ((HttpProxy) proxy).openTunnel(sadr, conTimeout, true);
+			}
+
+			//Logger.getLogger().logLine("NEW CONNECTION TO:"+socket);
+			if (ssl) {
+				socket.setSoTimeout(conTimeout); // avoid endless hang in SSL Handshake
+				if (sslSocketFactory == null)
+					sslSocketFactory = getDefaultSSLSocketFactory();
+				socket = sslSocketFactory.createSocket(socket, sadr.getHostName(), sadr.getPort(), true);
+				this.ssl = true;
+			}
 		}
 		socketIn = socket.getInputStream();
 		socketOut = socket.getOutputStream();
 		if (ssl) 
 			socket.setSoTimeout(0); //reset the read timeout for the SSL handshake
+	}
+
+	private Socket establishDOH2Connection() throws IOException {
+		return DOHHttp2Util.openHttp2Socket(sadr, conTimeout);
 	}
 
 	public void refreshConnection() throws IOException {
@@ -378,7 +395,8 @@ public class Connection implements TimeoutListener {
 	
 	private boolean isAlive() {
 		// Must only be called when sure that there is no data to read - otherwise Illegal State!
-		
+		if (doh2)
+			return true;
 		try {
 			socket.setSoTimeout(1);
 			int r = socketIn.read();
@@ -423,6 +441,12 @@ public class Connection implements TimeoutListener {
 		if (reuse) {
 			in.invalidate();
 			out.invalidate();
+			if (doh2) {
+				if (http2StreamID >= maxHttp2StreamID) {
+					release(false);
+					return;
+				} else http2StreamID = http2StreamID+2;
+			}
 			try {
 				socket.setSoTimeout(0);
 			} catch (SocketException e) {
@@ -491,6 +515,10 @@ public class Connection implements TimeoutListener {
 	// return destination (host:port:transport:proxy)
 	public String getDestination() {
 		return poolKey;
+	}
+
+	public int getHttp2StreamID() {
+		return http2StreamID;
 	}
 	
 }
