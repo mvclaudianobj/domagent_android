@@ -288,7 +288,7 @@ public class DOHHttp2Util {
 
 
     // ---- Send a single DNS query on a given stream and return parsed answers ----
-    public static byte[] sendDnsQuery(InetSocketAddress sadr, byte[] dnsQuery, int offs, int length, int timeout) throws Exception {
+    public static byte[] sendDnsQuery(InetSocketAddress sadr, String path, byte[] dnsQuery, int offs, int length, int timeout) throws Exception {
 
         SSLSocket socket = openHttp2Socket(sadr, timeout);
         try {
@@ -303,7 +303,7 @@ public class DOHHttp2Util {
             hpack.write(hpackIndexed(3)); // :method POST
             hpack.write(hpackIndexed(7)); // :scheme https
             hpack.write(hpackLiteral(":authority", sadr.getHostName()));
-            hpack.write(hpackLiteral(":path", "/dns-query"));
+            hpack.write(hpackLiteral(":path", path));
             hpack.write(hpackLiteral("content-type", "application/dns-message"));
             hpack.write(hpackLiteral("accept", "application/dns-message"));
             hpack.write(hpackLiteral("content-length", Integer.toString(length)));
@@ -454,7 +454,7 @@ public class DOHHttp2Util {
 
             // First request on stream 1: www.example.com A
             byte[] dnsQuery = buildDnsQuery("www.zenz-solutions.de", 1);
-            List<DnsAnswer> answers1 = parseDnsResponse(sendDnsQuery(sadr, dnsQuery, 0, dnsQuery.length, 0));
+            List<DnsAnswer> answers1 = parseDnsResponse(sendDnsQuery(sadr,"/dns-query", dnsQuery, 0, dnsQuery.length, 0));
             System.out.println("Results for www.example.com:");
             if (answers1.isEmpty()) {
                 System.out.println("  No answers parsed.");

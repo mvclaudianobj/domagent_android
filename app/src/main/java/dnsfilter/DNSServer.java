@@ -712,8 +712,8 @@ class DoH extends DNSServer {
 
 class DoH2 extends DNSServer {
     String url;
+    String path;
     String urlHost;
-    String reqTemplate;
     InetSocketAddress urlHostAddress;
 
     protected DoH2(InetAddress address, int port, int timeout, String url) throws IOException {
@@ -723,8 +723,15 @@ class DoH2 extends DNSServer {
             throw new IOException("Endpoint URL not defined for DNS over HTTPS (DoH)!");
 
         this.url = url;
-        buildTemplate();
+        parseURL();
         urlHostAddress = new InetSocketAddress(InetAddress.getByAddress(urlHost, address.getAddress()), port);
+    }
+
+    private void parseURL() throws IOException {
+        HttpHeader helper = new HttpHeader(HttpHeader.REQUEST_HEADER);
+        helper.setRequest("POST " + url + " " + "HTTP/1.1");
+        path = helper.url;
+        urlHost = helper.remote_host_name;
     }
 
     @Override
@@ -732,39 +739,17 @@ class DoH2 extends DNSServer {
         return "DOH";
     }
 
-    private void buildTemplate() throws IOException {
-        String user_agent = "Mozilla/5.0 (" + System.getProperty("os.name") + "; " + System.getProperty("os.version") + ")";
-        HttpHeader REQ_TEMPLATE = new HttpHeader(HttpHeader.REQUEST_HEADER);
-        REQ_TEMPLATE.setValue("User-Agent", user_agent);
-        REQ_TEMPLATE.setValue("Accept", "application/dns-message");
-        REQ_TEMPLATE.setValue("content-type", "application/dns-message");
-        REQ_TEMPLATE.setValue("Connection", "keep-alive");
-        REQ_TEMPLATE.setRequest("POST " + url + " " + "HTTP/1.1");
-        REQ_TEMPLATE.setValue("Content-Length", "999");
-
-        reqTemplate = REQ_TEMPLATE.getServerRequestHeader(false);
-        urlHost = REQ_TEMPLATE.remote_host_name;
-    }
-
-    private byte[] buildRequestHeader(int length) throws IOException {
-        return reqTemplate.replace("\nContent-Length: 999", "\nContent-Length: " + length).getBytes();
-    }
-
     @Override
     public void resolve(DatagramPacket request, DatagramPacket response) throws IOException {
         try {
             byte[] dnsReply = new byte[0];
-            dnsReply = DOHHttp2Util.sendDnsQuery(urlHostAddress, request.getData(), request.getOffset(), request.getLength(), timeout);
+            dnsReply = DOHHttp2Util.sendDnsQuery(urlHostAddress, path, request.getData(), request.getOffset(), request.getLength(), timeout);
             readResponseFromStream(new DataInputStream(new ByteArrayInputStream(dnsReply)), dnsReply.length, response);
         } catch (Exception e) {
             //Logger.getLogger().logException(e);
             throw new IOException(e);
         }
-
     }
-
-
-
 }
 
 
