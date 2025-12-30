@@ -441,7 +441,7 @@ public class DOHHttp2Util {
         return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, 0);
     }
 
-    private static int MAX_RETRY = 3;
+    private static int MAX_RETRY = 4;
 
     private static byte[] sendDnsQuery(InetSocketAddress sadr, String path,
                                        byte[] dnsQuery, int offs, int length,
