@@ -72,6 +72,7 @@ import util.http.DOHHttp2Util;
 	private SSLSocketFactory sslSocketFactory;
 	private Proxy proxy;
 	private int http2StreamID = 1;
+	private boolean isFresh = true;
 
 	private static int maxHttp2StreamID = 2147483647;
 
@@ -154,7 +155,7 @@ import util.http.DOHHttp2Util;
 		if (ssl)
 			return host+":"+port+":"+"ssl:"+proxy.hashCode()+":"+doh2;
 		else 
-			return host+":"+port+":"+"plain:"+proxy.hashCode();
+			return host+":"+port+":"+"plain:"+proxy.hashCode()+":"+doh2;
 	}
 	
 	
@@ -304,6 +305,7 @@ import util.http.DOHHttp2Util;
 		socket.setSoTimeout(sock_timeout);
 
 		initStreams();
+		isFresh = true;
 	}
 
 	public static void setPoolTimeoutSeconds(int secs) {
@@ -435,7 +437,9 @@ import util.http.DOHHttp2Util;
 		
 		if (!valid) //a killed connection already released
 			return;
-		
+
+		isFresh = false;
+
 		synchronized (connAcquired) {
 			connAcquired.remove(this);
 		}
@@ -522,5 +526,8 @@ import util.http.DOHHttp2Util;
 	public int getHttp2StreamID() {
 		return http2StreamID;
 	}
-	
+
+	public boolean isFresh() {
+		return isFresh;
+	}
 }

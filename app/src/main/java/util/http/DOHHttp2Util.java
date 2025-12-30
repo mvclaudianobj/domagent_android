@@ -451,10 +451,9 @@ public class DOHHttp2Util {
         try {
             con = Connection.connect(sadr, timeout, true, null, Proxy.NO_PROXY, true);
             if (retryCnt > 0) //retry
-                con.refreshConnection(); //ensure fresh connection is used
+                if (!con.isFresh()) con.refreshConnection(); //ensure fresh connection is used
 
             con.setSoTimeout(timeout);
-
 
             OutputStream out = con.getOutputStream();
             InputStream in = con.getInputStream();
