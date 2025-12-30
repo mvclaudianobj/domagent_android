@@ -80,25 +80,10 @@ public class DNSResolver implements Runnable {
 
 
 
-	public boolean resolveLocal(String client, DatagramPacket request, DatagramPacket response) throws IOException {
+	public boolean resolveLocal(String client, SimpleDNSMessage dnsQuery, DatagramPacket response) throws IOException {
 
 		if (!enableLocalResolver)
 			return false;
-
-		SimpleDNSMessage dnsQuery = null;
-		try {
-			dnsQuery = new SimpleDNSMessage(request.getData(), request.getOffset(), request.getLength());
-		} catch (Exception e){
-			if (ExecutionEnvironment.getEnvironment().debug()) {
-				File dump = new File(ExecutionEnvironment.getEnvironment().getWorkDir() + "/dnsdump_" + System.currentTimeMillis());
-				FileOutputStream dumpout = new FileOutputStream(dump);
-				dumpout.write(request.getData(), request.getOffset(), request.getLength());
-				dumpout.flush();
-				dumpout.close();
-			}
-			Logger.getLogger().logException(e);
-			throw new IOException(e);
-		}
 
 		if (!dnsQuery.isStandardQuery())
 			return false;
@@ -156,6 +141,30 @@ public class DNSResolver implements Runnable {
 		return true;
 	}
 
+	public SimpleDNSMessage getDNSQuery(String client, DatagramPacket request) throws IOException {
+		SimpleDNSMessage dnsQuery = null;
+		try {
+			dnsQuery = new SimpleDNSMessage(request.getData(), request.getOffset(), request.getLength());
+		} catch (Exception e){
+			if (ExecutionEnvironment.getEnvironment().debug()) {
+				File dump = new File(ExecutionEnvironment.getEnvironment().getWorkDir() + "/dnsdump_" + System.currentTimeMillis());
+				FileOutputStream dumpout = new FileOutputStream(dump);
+				dumpout.write(request.getData(), request.getOffset(), request.getLength());
+				dumpout.flush();
+				dumpout.close();
+			}
+			Logger.getLogger().logException(e);
+			throw new IOException(e);
+		}
+
+		if (dnsQuery.isResponse()) {
+			if (ExecutionEnvironment.getEnvironment().debug())
+				Logger.getLogger().logLine("Skipping response record, expected query record!");
+			return null; //not a query!
+		}
+		return dnsQuery;
+	}
+
 
 	private void processIPPackageMode() throws Exception {
 		int ttl = udpRequestPacket.getTTL();
@@ -178,8 +187,12 @@ public class DNSResolver implements Runnable {
 		// we can reuse the request data array
 		DatagramPacket response = new DatagramPacket(packetData, offs, packetData.length - offs);
 
+		SimpleDNSMessage query = getDNSQuery(clientID,request);
+		if (query == null) { //it is a response not a query
+			return;
+		}
 		//forward request to DNS and receive response
-		if (!resolveLocal(clientID, request, response)) {
+		if (!resolveLocal(clientID, query, response)) {
 			
 			DNSCommunicator.getInstance().requestDNS(request, response);
 
@@ -209,7 +222,12 @@ public class DNSResolver implements Runnable {
 		byte[] data = dataGramRequest.getData();
 		DatagramPacket response = new DatagramPacket(data, dataGramRequest.getOffset(), data.length - dataGramRequest.getOffset());
 
-		if (!resolveLocal(clientID, dataGramRequest, response)) {
+		SimpleDNSMessage query = getDNSQuery(clientID, dataGramRequest);
+		if (query == null) { //it is a response not a query
+			return;
+		}
+
+		if (!resolveLocal(clientID, query, response)) {
 			//forward request to DNS and receive response
 			DNSCommunicator.getInstance().requestDNS(dataGramRequest, response);
 

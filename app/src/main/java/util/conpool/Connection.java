@@ -275,7 +275,9 @@ import util.http.DOHHttp2Util;
 	}
 
 	private Socket establishDOH2Connection() throws IOException {
-		return DOHHttp2Util.openHttp2Socket(sadr, conTimeout);
+		Socket s = DOHHttp2Util.openHttp2Socket(sadr, conTimeout);
+		http2StreamID = 1;
+		return s;
 	}
 
 	public void refreshConnection() throws IOException {

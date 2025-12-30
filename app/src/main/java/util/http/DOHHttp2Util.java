@@ -438,17 +438,24 @@ public class DOHHttp2Util {
                                       byte[] dnsQuery, int offs, int length,
                                       int timeout) throws IOException {
 
-        return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, false);
+        return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, 0);
     }
+
+    private static int MAX_RETRY = 3;
 
     private static byte[] sendDnsQuery(InetSocketAddress sadr, String path,
                                        byte[] dnsQuery, int offs, int length,
-                                       int timeout, boolean retrying) throws IOException {
+                                       int timeout, int retryCnt) throws IOException {
 
-        Connection con = Connection.connect(sadr, timeout, true, null, Proxy.NO_PROXY, true);
-        con.setSoTimeout(timeout);
-
+        Connection con = null;
         try {
+            con = Connection.connect(sadr, timeout, true, null, Proxy.NO_PROXY, true);
+            if (retryCnt > 0) //retry
+                con.refreshConnection(); //ensure fresh connection is used
+
+            con.setSoTimeout(timeout);
+
+
             OutputStream out = con.getOutputStream();
             InputStream in = con.getInputStream();
 
@@ -559,7 +566,7 @@ public class DOHHttp2Util {
                         }
 
                         if (httpStatus != -1 && httpStatus != 200) {
-                            throw new IllegalStateException(
+                            throw new IOException(
                                     "DoH server returned HTTP status " + httpStatus + " on stream " + streamId);
                         }
 
@@ -604,7 +611,6 @@ public class DOHHttp2Util {
                 } else if (ftype == 0x07 && sid == 0) { // GOAWAY
                     //Logger.getLogger().logLine("HTTP/2 GOAWAY received, terminating connection.");
                     done = true;
-                    con.release(false);
                     throw new IOException("HTTP/2 GOAWAY from server");
                 } else {
                     // Ignore other frame types (PING, WINDOW_UPDATE from server, etc.) for now.
@@ -613,23 +619,38 @@ public class DOHHttp2Util {
 
             byte[] resp = responseBody.toByteArray();
             if (resp.length == 0) {
-                if (!retrying) {
-                    //retry
-                    con.release(false);
-                    return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, true);
-                } else {
-                    throw new IOException("DoH: empty body, HTTP status=" + httpStatus +
-                            " on stream " + streamId);
-                }
+                throw new IOException("DoH: empty body, HTTP status=" + httpStatus + " on stream " + streamId);
             }
-
             con.release(true);
+            //dumpResponse(resp);
             return resp;
 
         } catch (IOException e) {
+        	
+            //Logger.getLogger().logLine("received "+e.getMessage()+"! Retrying = "+retrying );
             //Logger.getLogger().logException(e);
-            con.release(false);
-            throw e;
+            if (con != null)
+                con.release(false);
+            if (retryCnt<MAX_RETRY) {
+                //retry once with fresh connection
+                retryCnt++;
+                //Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
+                return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt);
+            } else {
+                //Logger.getLogger().logLine("Already retried!!!");
+                throw e;
+            }
+        }
+    }
+
+    private static void dumpResponse(byte[]response) {
+        List<DnsAnswer> answers1 = parseDnsResponse(response);
+        if (answers1.isEmpty()) {
+            Logger.getLogger().logLine("  No answers parsed.");
+        } else {
+            for (DnsAnswer a : answers1) {
+                Logger.getLogger().logLine("  " + a);
+            }
         }
     }
 
@@ -648,28 +669,12 @@ public class DOHHttp2Util {
         for (int i = 0; i < 300; i++) {
             try {
                 byte[] dnsQuery = buildDnsQuery("www.zenz-solutions.de", 1);
-                List<DnsAnswer> answers1 = parseDnsResponse(
-                        sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
                 System.out.println("Results for www.zenz-solutions.de:");
-                if (answers1.isEmpty()) {
-                    System.out.println("  No answers parsed.");
-                } else {
-                    for (DnsAnswer a : answers1) {
-                        System.out.println("  " + a);
-                    }
-                }
+                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
 
                 dnsQuery = buildDnsQuery("www.example.com", 1);
-                List<DnsAnswer> answers2 = parseDnsResponse(
-                        sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
                 System.out.println("Results for www.example.com:");
-                if (answers2.isEmpty()) {
-                    System.out.println("  No answers parsed.");
-                } else {
-                    for (DnsAnswer a : answers2) {
-                        System.out.println("  " + a);
-                    }
-                }
+                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
 
             } catch (Exception e) {
                 System.err.println("Error: " + e.getMessage());
