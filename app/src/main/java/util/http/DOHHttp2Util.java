@@ -441,12 +441,41 @@ public class DOHHttp2Util {
         return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, 0);
     }
 
+    static boolean isValidDnsResponse(byte[] resp) {
+        // Must be at least DNS header size
+        if (resp == null || resp.length < 12) {
+            return false;
+        }
+
+        // Extract DNS header fields
+        int flags   = ((resp[2] & 0xFF) << 8) | (resp[3] & 0xFF);
+        int qdcount = ((resp[4] & 0xFF) << 8) | (resp[5] & 0xFF);
+        int ancount = ((resp[6] & 0xFF) << 8) | (resp[7] & 0xFF);
+
+        // QR bit must be 1 (response)
+        boolean qr = (flags & 0x8000) != 0;
+        if (!qr) return false;
+
+        // Opcode must be 0 (standard query)
+        int opcode = (flags >> 11) & 0xF;
+        if (opcode != 0) return false;
+
+        // QDCOUNT must be >= 1 (DoH always echoes the question)
+        if (qdcount < 1 || qdcount > 5) return false;
+
+        // ANCOUNT must be reasonable (0–20 is typical)
+        if (ancount < 0 || ancount > 50) return false;
+
+        // If we reach here, the header looks sane
+        return true;
+    }
+
+
     private static int MAX_RETRY = 4;
 
     private static byte[] sendDnsQuery(InetSocketAddress sadr, String path,
                                        byte[] dnsQuery, int offs, int length,
                                        int timeout, int retryCnt) throws IOException {
-
         Connection con = null;
         try {
             con = Connection.connect(sadr, timeout, true, null, Proxy.NO_PROXY, true);
@@ -620,6 +649,9 @@ public class DOHHttp2Util {
             if (resp.length == 0) {
                 throw new IOException("DoH: empty body, HTTP status=" + httpStatus + " on stream " + streamId);
             }
+            if (!isValidDnsResponse(resp)) {
+                throw new IOException("Received invalid DNS response from server!");
+            }
             con.release(true);
             //dumpResponse(resp);
             return resp;
@@ -633,10 +665,10 @@ public class DOHHttp2Util {
             if (retryCnt<MAX_RETRY) {
                 //retry once with fresh connection
                 retryCnt++;
-                //Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
+                Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
                 return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt);
             } else {
-                //Logger.getLogger().logLine("Already retried!!!");
+                Logger.getLogger().logLine("Already retried!!!");
                 throw e;
             }
         }
