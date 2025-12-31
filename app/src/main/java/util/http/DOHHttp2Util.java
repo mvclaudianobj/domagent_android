@@ -665,7 +665,7 @@ public class DOHHttp2Util {
             if (retryCnt<MAX_RETRY) {
                 //retry once with fresh connection
                 retryCnt++;
-                Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
+                //Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
                 return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt);
             } else {
                 Logger.getLogger().logLine("Already retried!!!");
