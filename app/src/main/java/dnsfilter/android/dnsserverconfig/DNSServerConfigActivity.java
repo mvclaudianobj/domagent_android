@@ -3,11 +3,13 @@ package dnsfilter.android.dnsserverconfig;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Insets;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -37,6 +39,19 @@ public class DNSServerConfigActivity extends Activity implements DNSServerConfig
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (Build.VERSION.SDK_INT >= 35) {
+            //requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+            View rootView = findViewById(android.R.id.content);
+
+            rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
+        }
+
         setContentView(R.layout.activitydnsserverconfig);
 
         setupActionBar();
