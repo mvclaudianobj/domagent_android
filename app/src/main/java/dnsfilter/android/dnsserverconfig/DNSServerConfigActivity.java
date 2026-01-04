@@ -3,18 +3,24 @@ package dnsfilter.android.dnsserverconfig;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Insets;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import dnsfilter.android.PaddedCheckBox;
@@ -36,12 +42,14 @@ public class DNSServerConfigActivity extends Activity implements DNSServerConfig
     private ImageButton applyNewConfigurationButton;
 
     public static final Integer ACTIVITY_RESULT_CODE = 325;
+    static TextView titleView = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (Build.VERSION.SDK_INT >= 35) {
-            //requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (Build.VERSION.SDK_INT >= 35) { // on API >=35 activity intersects with system and Navigation bar)
+            requestWindowFeature(Window.FEATURE_NO_TITLE);
 
             View rootView = findViewById(android.R.id.content);
 
@@ -53,6 +61,54 @@ public class DNSServerConfigActivity extends Activity implements DNSServerConfig
         }
 
         setContentView(R.layout.activitydnsserverconfig);
+
+        if (Build.VERSION.SDK_INT >= 35) { //add custom title as activity title is removed above
+            // 1. get current content
+            ViewGroup content = findViewById(android.R.id.content);
+            if (content == null) return;
+
+            // 2. current root
+            if (content.getChildCount() == 0) return;
+            View oldRoot = content.getChildAt(0);
+            content.removeAllViews();
+
+            // 3. New Container creation (vertikal)
+            LinearLayout wrapper = new LinearLayout(this);
+            wrapper.setOrientation(LinearLayout.VERTICAL);
+            wrapper.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+
+            // 4. add custom title on API >=35 as build in title is removed
+            titleView = new TextView(this);;
+            titleView.setTextSize(16);
+            titleView.setSingleLine(true);
+            titleView.setEllipsize(TextUtils.TruncateAt.END);
+            titleView.setMaxLines(1);
+            titleView.setTypeface(null, Typeface.BOLD);
+            titleView.setPadding(32, 32, 32, 32);
+            titleView.setBackgroundColor(Color.parseColor("#00BCD4"));
+            titleView.setTextColor(Color.parseColor("#FFFFFF"));
+
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+
+            // 5. add old UI below
+            LinearLayout.LayoutParams oldLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+            );
+
+            wrapper.addView(titleView, titleLp);
+            wrapper.addView(oldRoot, oldLp);
+
+            // 6. add the wrapper
+            content.addView(wrapper);
+        }
 
         setupActionBar();
         findViews();
@@ -76,9 +132,12 @@ public class DNSServerConfigActivity extends Activity implements DNSServerConfig
             window.setStatusBarColor(this.getResources().getColor(R.color.colorPrimary));
             getWindow().setNavigationBarColor(getResources().getColor(R.color.colorPrimary));
         }
-
-        ActionBar bar = getActionBar();
-        bar.setTitle(R.string.dnsCfgConfigDialogTitle);
+        if (Build.VERSION.SDK_INT >= 35) {
+            titleView.setText(R.string.dnsCfgConfigDialogTitle);
+        } else {
+            ActionBar bar = getActionBar();
+            bar.setTitle(R.string.dnsCfgConfigDialogTitle);
+        }
     }
 
     private void findViews() {
