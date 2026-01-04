@@ -396,7 +396,7 @@ public class DNSProxyActivity extends Activity
 						ViewGroup.LayoutParams.MATCH_PARENT
 				));
 
-				// 4. TitleView erzeugen
+				// 4. add custom title on API >=35 as build in title is removed
 				titleView = new TextView(this);
 				titleView.setText("personalDNSfilter");
 				titleView.setTextSize(16);
@@ -413,20 +413,19 @@ public class DNSProxyActivity extends Activity
 						ViewGroup.LayoutParams.WRAP_CONTENT
 				);
 
-				// 5. Altes Layout darunter einfügen
+				// 5. add old UI below
 				LinearLayout.LayoutParams oldLp = new LinearLayout.LayoutParams(
 						ViewGroup.LayoutParams.MATCH_PARENT,
 						0,
-						1f // nimmt den Rest des Platzes
+						1f
 				);
 
 				wrapper.addView(titleView, titleLp);
 				wrapper.addView(oldRoot, oldLp);
 
-				// 6. Wrapper wieder in android.R.id.content einfügen
+				// 6. add the wrapper
 				content.addView(wrapper);
 			}
-
 
 			//log view init
 			Spannable logTxt = null;
