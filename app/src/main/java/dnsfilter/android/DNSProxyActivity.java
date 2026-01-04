@@ -31,6 +31,8 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Insets;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -43,6 +45,7 @@ import android.text.Html;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.Spanned;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.LinkMovementMethod;
 import android.transition.TransitionManager;
@@ -56,10 +59,12 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TableLayout;
 import android.widget.TextView;
@@ -146,7 +151,7 @@ public class DNSProxyActivity extends Activity
 	protected static MenuItem remove_filter;
 	protected static String[] availableBackups;
 	protected static int selectedBackup;
-
+	protected static TextView titleView = null;
 	protected static boolean additionalHostsChanged = false;
 	protected static boolean manuallyConfEdited = false;
 	protected static SuppressRepeatingsLogger myLogger;
@@ -321,6 +326,13 @@ public class DNSProxyActivity extends Activity
 		}
 	}
 
+	@Override
+	public void setTitle(CharSequence title) {
+		if (Build.VERSION.SDK_INT >= 35)
+			titleView.setText(title);
+		else super.setTitle(title);
+	}
+
 	/**
 	 * Called when the activity is first created.
 	 */
@@ -352,7 +364,69 @@ public class DNSProxyActivity extends Activity
 				getWindow().setNavigationBarColor(getResources().getColor(R.color.colorPrimary));
 			}
 
+			if (Build.VERSION.SDK_INT >= 35) {
+				requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+				View rootView = findViewById(android.R.id.content);
+
+				rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+					Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+					v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+					return insets;
+				});
+			}
+
 			setContentView(R.layout.main);
+
+			if (Build.VERSION.SDK_INT >= 35) {
+				// 1. Content-Root holen
+				ViewGroup content = findViewById(android.R.id.content);
+				if (content == null) return;
+
+				// 2. Bisheriges Root-View aus main.xml holen
+				if (content.getChildCount() == 0) return;
+				View oldRoot = content.getChildAt(0);
+				content.removeAllViews();
+
+				// 3. Neuen Container erstellen (vertikal)
+				LinearLayout wrapper = new LinearLayout(this);
+				wrapper.setOrientation(LinearLayout.VERTICAL);
+				wrapper.setLayoutParams(new ViewGroup.LayoutParams(
+						ViewGroup.LayoutParams.MATCH_PARENT,
+						ViewGroup.LayoutParams.MATCH_PARENT
+				));
+
+				// 4. TitleView erzeugen
+				titleView = new TextView(this);
+				titleView.setText("personalDNSfilter");
+				titleView.setTextSize(16);
+				titleView.setSingleLine(true);
+				titleView.setEllipsize(TextUtils.TruncateAt.END);
+				titleView.setMaxLines(1);
+				titleView.setTypeface(null, Typeface.BOLD);
+				titleView.setPadding(32, 32, 32, 32);
+				titleView.setBackgroundColor(Color.parseColor("#00BCD4"));
+				titleView.setTextColor(Color.parseColor("#FFFFFF"));
+
+				LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+						ViewGroup.LayoutParams.MATCH_PARENT,
+						ViewGroup.LayoutParams.WRAP_CONTENT
+				);
+
+				// 5. Altes Layout darunter einfügen
+				LinearLayout.LayoutParams oldLp = new LinearLayout.LayoutParams(
+						ViewGroup.LayoutParams.MATCH_PARENT,
+						0,
+						1f // nimmt den Rest des Platzes
+				);
+
+				wrapper.addView(titleView, titleLp);
+				wrapper.addView(oldRoot, oldLp);
+
+				// 6. Wrapper wieder in android.R.id.content einfügen
+				content.addView(wrapper);
+			}
+
 
 			//log view init
 			Spannable logTxt = null;
