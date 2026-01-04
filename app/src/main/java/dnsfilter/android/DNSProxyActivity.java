@@ -378,17 +378,16 @@ public class DNSProxyActivity extends Activity
 
 			setContentView(R.layout.main);
 
-			if (Build.VERSION.SDK_INT >= 35) {
-				// 1. Content-Root holen
+			if (Build.VERSION.SDK_INT >= 35) { // add custom title as activity title was removed above for API >=35
+				// 1. current Content-Root
 				ViewGroup content = findViewById(android.R.id.content);
 				if (content == null) return;
 
-				// 2. Bisheriges Root-View aus main.xml holen
 				if (content.getChildCount() == 0) return;
 				View oldRoot = content.getChildAt(0);
 				content.removeAllViews();
 
-				// 3. Neuen Container erstellen (vertikal)
+				// 3. create new container
 				LinearLayout wrapper = new LinearLayout(this);
 				wrapper.setOrientation(LinearLayout.VERTICAL);
 				wrapper.setLayoutParams(new ViewGroup.LayoutParams(
