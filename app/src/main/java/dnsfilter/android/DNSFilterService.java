@@ -299,8 +299,9 @@ public class DNSFilterService extends VpnService  {
 				int max_resolvers  = Integer.parseInt(DNSFilterManager.getInstance().getConfig().getProperty("maxResolverCount", "100"));;
 				while (!stopped) {
 					byte[] data = new byte[DNSServer.getBufSize()];
+
 					int length = in.read(data);
-				
+
 					if (stopped)
 						break;
 
@@ -778,6 +779,7 @@ public class DNSFilterService extends VpnService  {
 			}
 
 			startForeground(1, noti);
+			return START_STICKY;
 
 		} catch (Exception e) {
 			Logger.getLogger().logException(e);
