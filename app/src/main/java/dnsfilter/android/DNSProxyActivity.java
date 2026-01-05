@@ -364,7 +364,7 @@ public class DNSProxyActivity extends Activity
 				getWindow().setNavigationBarColor(getResources().getColor(R.color.colorPrimary));
 			}
 
-			if (Build.VERSION.SDK_INT >= 35) {
+			if (Build.VERSION.SDK_INT >= 35) { // in API >= 35 app intersects with status and navigation bar.
 				requestWindowFeature(Window.FEATURE_NO_TITLE);
 
 				View rootView = findViewById(android.R.id.content);
