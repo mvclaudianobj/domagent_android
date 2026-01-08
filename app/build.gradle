@@ -1,13 +1,13 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "dnsfilter.android"
         minSdkVersion 17
         //noinspection EditedTargetSdkVersion
-        targetSdkVersion 35
+        targetSdkVersion 36
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
