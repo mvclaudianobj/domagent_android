@@ -743,7 +743,7 @@ class DoH2 extends DNSServer {
     public void resolve(DatagramPacket request, DatagramPacket response) throws IOException {
         try {
             byte[] dnsReply = new byte[0];
-            dnsReply = DOHHttp2Util.sendDnsQuery(urlHostAddress, path, request.getData(), request.getOffset(), request.getLength(), timeout);
+            dnsReply = DOHHttp2Util.sendDnsQuery(urlHostAddress, path, request.getData(), request.getOffset(), request.getLength(), timeout, proxy);
             readResponseFromStream(new DataInputStream(new ByteArrayInputStream(dnsReply)), dnsReply.length, response);
         } catch (Exception e) {
             //Logger.getLogger().logException(e);

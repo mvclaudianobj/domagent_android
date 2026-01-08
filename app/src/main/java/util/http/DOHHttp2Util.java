@@ -6,6 +6,7 @@ import javax.net.ssl.SSLSocket;
 import util.ExecutionEnvironment;
 import util.Logger;
 import util.conpool.Connection;
+import util.conpool.HttpProxy;
 
 import javax.net.ssl.SSLParameters;
 
@@ -352,13 +353,20 @@ public class DOHHttp2Util {
 
     // ---- Connection bootstrap (once) ----
 
-    public static SSLSocket openHttp2Socket(InetSocketAddress sadr, int timeout) throws IOException {
+    public static SSLSocket openHttp2Socket(InetSocketAddress sadr, int timeout, Proxy proxy) throws IOException {
         Socket socket = null;
         try {
             SSLContext sslContext = SSLContext.getDefault();
-            socket = SocketChannel.open().socket();
-            ExecutionEnvironment.getEnvironment().protectSocket(socket, 0);
-            socket.connect(sadr, timeout);
+            if (proxy == Proxy.NO_PROXY) {
+                socket = SocketChannel.open().socket();
+                ExecutionEnvironment.getEnvironment().protectSocket(socket, 0);
+                socket.connect(sadr, timeout);
+            } else {
+                if (!(proxy instanceof HttpProxy))
+                    throw new IOException("Only " + HttpProxy.class.getName() + " supported for creating connection over tunnel!");
+                socket = ((HttpProxy) proxy).openTunnel(sadr, timeout, true);
+            }
+
             SSLSocket sslsocket = (SSLSocket) sslContext.getSocketFactory()
                     .createSocket(socket, sadr.getHostName(), sadr.getPort(), true);
             SSLParameters params = sslsocket.getSSLParameters();
@@ -436,9 +444,9 @@ public class DOHHttp2Util {
 
     public static byte[] sendDnsQuery(InetSocketAddress sadr, String path,
                                       byte[] dnsQuery, int offs, int length,
-                                      int timeout) throws IOException {
+                                      int timeout, Proxy proxy) throws IOException {
 
-        return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, 0);
+        return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, 0, proxy);
     }
 
     static boolean isValidDnsResponse(byte[] resp) {
@@ -475,10 +483,10 @@ public class DOHHttp2Util {
 
     private static byte[] sendDnsQuery(InetSocketAddress sadr, String path,
                                        byte[] dnsQuery, int offs, int length,
-                                       int timeout, int retryCnt) throws IOException {
+                                       int timeout, int retryCnt, Proxy proxy) throws IOException {
         Connection con = null;
         try {
-            con = Connection.connect(sadr, timeout, true, null, Proxy.NO_PROXY, true);
+            con = Connection.connect(sadr, timeout, true, null, proxy, true);
             if (retryCnt > 0) //retry
                 if (!con.isFresh()) con.refreshConnection(); //ensure fresh connection is used
 
@@ -666,7 +674,7 @@ public class DOHHttp2Util {
                 //retry once with fresh connection
                 retryCnt++;
                 //Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
-                return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt);
+                return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt, proxy);
             } else {
                 Logger.getLogger().logLine("Already retried!!!");
                 throw e;
@@ -701,11 +709,11 @@ public class DOHHttp2Util {
             try {
                 byte[] dnsQuery = buildDnsQuery("www.zenz-solutions.de", 1);
                 System.out.println("Results for www.zenz-solutions.de:");
-                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
+                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0, Proxy.NO_PROXY));
 
                 dnsQuery = buildDnsQuery("www.example.com", 1);
                 System.out.println("Results for www.example.com:");
-                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0));
+                dumpResponse(sendDnsQuery(sadr, "/dns-query", dnsQuery, 0, dnsQuery.length, 0, Proxy.NO_PROXY));
 
             } catch (Exception e) {
                 System.err.println("Error: " + e.getMessage());

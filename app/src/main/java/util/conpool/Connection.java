@@ -276,7 +276,7 @@ import util.http.DOHHttp2Util;
 	}
 
 	private Socket establishDOH2Connection() throws IOException {
-		Socket s = DOHHttp2Util.openHttp2Socket(sadr, conTimeout);
+		Socket s = DOHHttp2Util.openHttp2Socket(sadr, conTimeout, proxy);
 		http2StreamID = 1;
 		return s;
 	}
