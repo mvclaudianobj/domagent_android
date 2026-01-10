@@ -356,8 +356,15 @@ public class DNSFilterService extends VpnService  {
 
 			} catch (Exception e) {
 				if (!stopped) { //not stopped
-					Logger.getLogger().logLine("VPN);Runner died!");
+					Logger.getLogger().logLine("VPN Runner died!");
 					Logger.getLogger().logException(e);
+					e.printStackTrace(System.err);
+					try {
+						INSTANCE.restartVPN(true);
+					} catch (Exception e2) {
+						Logger.getLogger().logLine("Restart failed "+e2);
+						e2.printStackTrace(System.err);
+					}
 				}
 			}
 
