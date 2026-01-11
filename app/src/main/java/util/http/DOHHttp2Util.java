@@ -136,7 +136,7 @@ public class DOHHttp2Util {
 
     // ---- DNS wire-format helpers ----
 
-    static byte[] buildDnsQuery(String qname, int qtype) throws Exception {
+    static byte[] buildDnsQuery(String qname, int qtype) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         // Header: ID(2), Flags(2), QDCOUNT(2), ANCOUNT(2), NSCOUNT(2), ARCOUNT(2)
         writeU16(out, 0x1234);   // ID
@@ -376,7 +376,7 @@ public class DOHHttp2Util {
             sslsocket.startHandshake();
             String negotiated = sslsocket.getApplicationProtocol();
             if (!"h2".equals(negotiated)) {
-                throw new IllegalStateException("HTTP/2 not negotiated; got: " + negotiated);
+                throw new IOException("HTTP/2 not negotiated; got: " + negotiated);
             }
 
             OutputStream out = sslsocket.getOutputStream();
@@ -643,7 +643,7 @@ public class DOHHttp2Util {
                     }
 
                 } else if (ftype == 0x03) { // RST_STREAM
-                    throw new IllegalStateException("Stream " + streamId + " reset by server");
+                    throw new IOException("Stream " + streamId + " reset by server");
                 } else if (ftype == 0x07 && sid == 0) { // GOAWAY
                     //Logger.getLogger().logLine("HTTP/2 GOAWAY received, terminating connection.");
                     done = true;
