@@ -676,7 +676,7 @@ public class DOHHttp2Util {
                 //Logger.getLogger().logLine("received "+e.getMessage()+"! ... retryCnt..."+retryCnt);
                 return sendDnsQuery(sadr, path, dnsQuery, offs, length, timeout, retryCnt, proxy);
             } else {
-                Logger.getLogger().logLine("Already retried!!!");
+                //Logger.getLogger().logLine("Already retried!!!");
                 throw e;
             }
         }
