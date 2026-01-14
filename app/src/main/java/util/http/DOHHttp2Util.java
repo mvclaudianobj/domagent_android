@@ -341,14 +341,14 @@ public class DOHHttp2Util {
         out.write(streamId & 0xFF);
     }
 
-    static boolean readFully(InputStream in, byte[] buf, int len) throws IOException {
+    static void readFully(InputStream in, byte[] buf, int len) throws IOException {
         int off = 0;
         while (off < len) {
             int r = in.read(buf, off, len - off);
-            if (r == -1) return false;
+            if (r == -1)
+                throw new IOException("Unexpected end of stream!");
             off += r;
         }
-        return true;
     }
 
     // ---- Connection bootstrap (once) ----
@@ -398,7 +398,7 @@ public class DOHHttp2Util {
             boolean acked = false;
             for (int i = 0; i < 8 && !acked; i++) {
                 byte[] header = new byte[9];
-                if (!readFully(in, header, 9)) break;
+                readFully(in, header, 9);
                 int flen = ((header[0] & 0xFF) << 16) | ((header[1] & 0xFF) << 8) | (header[2] & 0xFF);
                 int ftype = header[3] & 0xFF;
                 int fflags = header[4] & 0xFF;
@@ -406,7 +406,7 @@ public class DOHHttp2Util {
                         | ((header[7] & 0xFF) << 8) | (header[8] & 0xFF);
                 if (flen > 0) {
                     byte[] payload = new byte[flen];
-                    if (!readFully(in, payload, flen)) break;
+                    readFully(in, payload, flen);
                 }
                 if (streamId == 0 && ftype == 0x04 && (fflags & 0x01) == 0) {
                     // Send SETTINGS ACK
@@ -534,9 +534,7 @@ public class DOHHttp2Util {
 
             while (!done) {
                 byte[] header = new byte[9];
-                if (!readFully(in, header, 9)) {
-                    break;
-                }
+                readFully(in, header, 9);
 
                 int flen = ((header[0] & 0xFF) << 16)
                         | ((header[1] & 0xFF) << 8)
@@ -549,9 +547,8 @@ public class DOHHttp2Util {
                         | (header[8] & 0xFF);
 
                 byte[] payload = new byte[flen];
-                if (flen > 0 && !readFully(in, payload, flen)) {
-                    break;
-                }
+                if (flen > 0)
+                    readFully(in, payload, flen);
 
                 // Connection-level SETTINGS mid-stream
                 if (sid == 0 && ftype == 0x04) { // SETTINGS
