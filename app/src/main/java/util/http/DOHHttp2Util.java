@@ -658,7 +658,7 @@ public class DOHHttp2Util {
                 throw new IOException("DoH: empty body, HTTP status=" + httpStatus + " on stream " + streamId);
             }
             if (!isValidDnsResponse(resp)) {
-                throw new IOException("Received invalid DNS response from server!");
+                throw new IOException("Received invalid DNS response from server! "+new String(resp,0,Math.min(100, resp.length)));
             }
             con.release(true);
             //dumpResponse(resp);
