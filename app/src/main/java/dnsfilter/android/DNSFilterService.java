@@ -676,14 +676,14 @@ public class DNSFilterService extends VpnService  {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
-		if (is_running) {
-			Logger.getLogger().logLine("Ignoring duplicate start after update!");
-			return START_STICKY;
-		}
 		AndroidEnvironment.initEnvironment(this);
 		INSTANCE = this;
 		SERVICE = intent;
 
+		if (is_running) {
+			Logger.getLogger().logLine("Ignoring duplicate start after update!");
+			return START_STICKY;
+		}
 		if (DNSFILTER != null) {
 			Logger.getLogger().logLine("DNS filter already running!");
 		} else {
