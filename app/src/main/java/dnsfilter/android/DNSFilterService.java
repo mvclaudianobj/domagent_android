@@ -686,7 +686,7 @@ public class DNSFilterService extends VpnService  {
 		}
 
 		INSTANCE = this;
-		
+
 		if (DNSFILTER != null) {
 			Logger.getLogger().logLine("DNS filter already running!");
 		} else {
