@@ -650,6 +650,9 @@ public class DNSFilterService extends VpnService  {
 			excludeApp("com.google.android.apps.translate", builder); //white list google translate
 		}
 
+		// Bloqueio de apps por regras do DomCustos (bloqueia acesso à rede via VPN)
+		applyBlockedApps(builder);
+
 		if (Build.VERSION.SDK_INT >= 21) {
 			builder.setBlocking(true);
 			if (explicitOp)
@@ -671,6 +674,7 @@ public class DNSFilterService extends VpnService  {
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
 		AndroidEnvironment.initEnvironment(this);
+		DomCustosAPI.initialize(this);
 		INSTANCE = this;
 		SERVICE = intent;
 
@@ -691,6 +695,10 @@ public class DNSFilterService extends VpnService  {
 				dnsProxyOnlyLocal = Boolean.parseBoolean(DNSFILTER.getConfig().getProperty("dnsProxyOnlyLocalRequests", "true"));
 				rootMode = Boolean.parseBoolean(DNSFILTER.getConfig().getProperty("rootModeOnAndroid", "false"));
 				vpnInAdditionToProxyMode = Boolean.parseBoolean(DNSFILTER.getConfig().getProperty("vpnInAdditionToProxyMode", "false"));
+
+				if (dnsProxyMode && !vpnInAdditionToProxyMode && !DomCustosAPI.getBlockedApps().isEmpty()) {
+					Logger.getLogger().logLine("WARNING: Bloqueio de apps requer VPN ativa. Habilite VPN ou vpnInAdditionToProxyMode.");
+				}
 
 				if (rootMode && !dnsProxyMode) {
 					rootMode = false;
@@ -951,6 +959,36 @@ public class DNSFilterService extends VpnService  {
 			builder.addDisallowedApplication(app);
 		} catch (PackageManager.NameNotFoundException e) {
 			Logger.getLogger().logLine("Error during app whitelisting:" + e.getMessage());
+		}
+	}
+
+	private void applyBlockedApps(Builder builder) {
+		if (Build.VERSION.SDK_INT < 21) {
+			return;
+		}
+		try {
+			List<String> blockedApps = DomCustosAPI.getBlockedApps();
+			if (blockedApps == null || blockedApps.isEmpty()) {
+				return;
+			}
+			String selfPackage = getPackageName();
+			for (String pkg : blockedApps) {
+				if (pkg == null) {
+					continue;
+				}
+				String normalized = pkg.trim();
+				if (normalized.isEmpty() || normalized.equalsIgnoreCase(selfPackage)) {
+					continue;
+				}
+				try {
+					builder.addDisallowedApplication(normalized);
+					Logger.getLogger().logLine("App bloqueado via VPN: " + normalized);
+				} catch (PackageManager.NameNotFoundException e) {
+					Logger.getLogger().logLine("App para bloqueio não encontrado: " + normalized);
+				}
+			}
+		} catch (Exception e) {
+			Logger.getLogger().logException(e);
 		}
 	}
 

@@ -8,5 +8,6 @@ public class DomCustosAgentApp extends Application {
     public void onCreate() {
         super.onCreate();
         AndroidEnvironment.initEnvironment(this);
+        DomCustosAPI.initialize(this);
     }
 }

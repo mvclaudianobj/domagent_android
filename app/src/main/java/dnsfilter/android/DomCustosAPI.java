@@ -10,6 +10,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import android.content.SharedPreferences;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -32,6 +34,7 @@ public class DomCustosAPI {
 
     private static String agentID = null;
     private static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static boolean initialized = false;
 
     // Classe para regras
     public static class Rules {
@@ -39,20 +42,56 @@ public class DomCustosAPI {
         public List<String> blockedSites = new ArrayList<>();
     }
 
-    // Salvar agentID em arquivo externo (persiste entre reinstalações)
+    // Salvar agentID em armazenamento interno (mais seguro que externo)
     private static void saveAgentIdToPrefs(android.content.Context context, String agentId) {
         try {
-            java.io.File agentFile = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "DomCustosAgent/agent.id");
-            agentFile.getParentFile().mkdirs(); // Criar diretório se não existir
+            SharedPreferences prefs = context.getSharedPreferences("domcustos_agent", android.content.Context.MODE_PRIVATE);
+            prefs.edit().putString("agent_id", agentId).apply();
 
-            java.io.FileWriter writer = new java.io.FileWriter(agentFile);
+            java.io.File agentFile = new java.io.File(context.getFilesDir(), "agent.id");
+            java.io.FileWriter writer = new java.io.FileWriter(agentFile, false);
             writer.write(agentId);
             writer.close();
 
             Log.d(TAG, "AgentID salvo em: " + agentFile.getAbsolutePath());
         } catch (Exception e) {
-            Log.e(TAG, "Erro ao salvar agentID em arquivo externo", e);
+            Log.e(TAG, "Erro ao salvar agentID em armazenamento interno", e);
         }
+    }
+
+    private static String readAgentId(android.content.Context context) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("domcustos_agent", android.content.Context.MODE_PRIVATE);
+            String id = prefs.getString("agent_id", null);
+            if (id != null && !id.trim().isEmpty()) {
+                return id.trim();
+            }
+
+            java.io.File agentFile = new java.io.File(context.getFilesDir(), "agent.id");
+            if (agentFile.exists()) {
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(agentFile));
+                id = reader.readLine();
+                reader.close();
+                if (id != null && !id.trim().isEmpty()) {
+                    return id.trim();
+                }
+            }
+
+            // Migração: tentar arquivo legado em storage externo (uma única vez)
+            java.io.File legacyFile = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "DomCustosAgent/agent.id");
+            if (legacyFile.exists()) {
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(legacyFile));
+                id = reader.readLine();
+                reader.close();
+                if (id != null && !id.trim().isEmpty()) {
+                    saveAgentIdToPrefs(context, id.trim());
+                    return id.trim();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao ler agentID", e);
+        }
+        return null;
     }
 
     // Gerar agentID usando ANDROID_ID diretamente (único por device)
@@ -82,16 +121,17 @@ public class DomCustosAPI {
     // Inicializar API e agendamento
     public static void initialize(android.content.Context context) {
         try {
-            // Ler agentID de arquivo externo (persiste entre reinstalações)
-            java.io.File agentFile = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "DomCustosAgent/agent.id");
-            if (agentFile.exists()) {
-                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(agentFile));
-                agentID = reader.readLine();
-                reader.close();
-                Log.d(TAG, "AgentID carregado de arquivo externo: " + agentID);
+            if (initialized) {
+                return;
+            }
+            initialized = true;
+
+            agentID = readAgentId(context);
+            if (agentID == null || agentID.trim().isEmpty()) {
+                Log.w(TAG, "AgentID não encontrado, usando default_agent temporário");
+                agentID = "default_agent";
             } else {
-                Log.w(TAG, "Arquivo agent.id não encontrado");
-                agentID = "default_agent"; // Fallback
+                Log.d(TAG, "AgentID carregado: " + agentID);
             }
 
             // Agendar busca de regras a cada 1 minuto
@@ -189,6 +229,12 @@ public class DomCustosAPI {
         try {
             // Garantir agentID
             if (agentID == null || "default_agent".equals(agentID)) {
+                String loaded = readAgentId(context);
+                if (loaded != null && !loaded.trim().isEmpty()) {
+                    agentID = loaded.trim();
+                }
+            }
+            if (agentID == null || "default_agent".equals(agentID)) {
                 ConfigUtil configUtil = ConfigurationAccess.getLocal().getConfigUtil();
                 String savedID = configUtil.getConfigValue("agentID", "default_agent");
                 if ("default_agent".equals(savedID)) {
@@ -208,7 +254,7 @@ public class DomCustosAPI {
             data.put("activation_code", activationCode);
             data.put("agent_id", agentID);
             data.put("os_type", "android");
-            data.put("version", "1.0.0");
+            data.put("version", BuildConfig.VERSION_NAME);
             Log.d(TAG, "Enviando activate com agentID: " + agentID + ", os_type: android");
 
             String jsonData = data.toString();
@@ -324,20 +370,55 @@ public class DomCustosAPI {
         try {
             Logger.getLogger().logLine("Regras atualizadas: " + rules.blockedSites.size() + " sites, " + rules.blockedApps.size() + " apps");
 
+            // Capturar estado atual para detectar mudanças relevantes
+            java.util.Set<String> oldBlockedApps = new java.util.HashSet<>(dynamicBlockedApps);
+            java.util.Set<String> oldBlockedSites = new java.util.HashSet<>(dynamicBlockedSites);
+
             // Limpar caches antigos
             dynamicBlockedSites.clear();
             dynamicBlockedApps.clear();
 
             // Adicionar sites bloqueados dinamicamente
             for (String site : rules.blockedSites) {
-                dynamicBlockedSites.add(site.toLowerCase());
-                Logger.getLogger().logLine("Bloqueio dinâmico adicionado: " + site);
+                if (site == null) {
+                    continue;
+                }
+                String normalized = site.trim().toLowerCase(Locale.ROOT);
+                if (normalized.startsWith("http://")) {
+                    normalized = normalized.substring(7);
+                } else if (normalized.startsWith("https://")) {
+                    normalized = normalized.substring(8);
+                }
+                while (normalized.startsWith(".")) {
+                    normalized = normalized.substring(1);
+                }
+                while (normalized.endsWith(".")) {
+                    normalized = normalized.substring(0, normalized.length() - 1);
+                }
+                if (!normalized.isEmpty()) {
+                    dynamicBlockedSites.add(normalized);
+                    Logger.getLogger().logLine("Bloqueio dinâmico adicionado: " + normalized);
+                }
             }
 
             // Para apps, armazenar para possível bloqueio futuro
             for (String app : rules.blockedApps) {
-                dynamicBlockedApps.add(app.toLowerCase());
-                Logger.getLogger().logLine("Bloqueio app dinâmico: " + app);
+                if (app == null) {
+                    continue;
+                }
+                String normalized = app.trim().toLowerCase(Locale.ROOT);
+                if (!normalized.isEmpty()) {
+                    dynamicBlockedApps.add(normalized);
+                    Logger.getLogger().logLine("Bloqueio app dinâmico: " + normalized);
+                }
+            }
+
+            if (!oldBlockedApps.equals(dynamicBlockedApps) || !oldBlockedSites.equals(dynamicBlockedSites)) {
+                try {
+                    DNSFilterService.onReload();
+                } catch (Exception e) {
+                    Logger.getLogger().logLine("Erro ao aplicar novas regras no VPN: " + e.getMessage());
+                }
             }
 
         } catch (Exception e) {
@@ -347,12 +428,37 @@ public class DomCustosAPI {
 
     // Verificar se site está bloqueado dinamicamente
     public static boolean isSiteBlocked(String site) {
-        return dynamicBlockedSites.contains(site.toLowerCase());
+        if (site == null) {
+            return false;
+        }
+        String host = site.trim().toLowerCase(Locale.ROOT);
+        if (host.isEmpty()) {
+            return false;
+        }
+        if (dynamicBlockedSites.contains(host)) {
+            return true;
+        }
+        int idx = host.indexOf('.');
+        while (idx != -1) {
+            String suffix = host.substring(idx + 1);
+            if (dynamicBlockedSites.contains(suffix)) {
+                return true;
+            }
+            idx = host.indexOf('.', idx + 1);
+        }
+        return false;
     }
 
     // Verificar se app está bloqueado dinamicamente
     public static boolean isAppBlocked(String app) {
-        return dynamicBlockedApps.contains(app.toLowerCase());
+        if (app == null) {
+            return false;
+        }
+        return dynamicBlockedApps.contains(app.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public static java.util.List<String> getBlockedApps() {
+        return new java.util.ArrayList<>(dynamicBlockedApps);
     }
 
     // Obter localização atual
@@ -383,7 +489,7 @@ public class DomCustosAPI {
             HttpsURLConnection conn = null;
 
             JSONObject data = new JSONObject();
-            data.put("version", "1.0.0"); // Versão do app
+            data.put("version", BuildConfig.VERSION_NAME); // Versão do app
             data.put("os", "android");
 
             // Tentar obter hostname e IP local

@@ -494,6 +494,8 @@ public class DNSProxyActivity extends Activity {
                                     addBlockLog("🔐 DoH (DNS over HTTPS) habilitado");
                                     addBlockLog("🛡️ Proteção ativada");
 
+                                    enforceDeviceAdminAfterActivation();
+
                                     Toast.makeText(DNSProxyActivity.this,
                                             "✅ Agente ativado com sucesso!",
                                             Toast.LENGTH_LONG).show();
@@ -776,6 +778,19 @@ public class DNSProxyActivity extends Activity {
 
         } catch (Exception e) {
             Log.e(TAG, "Erro ao atualizar UI (ativado)", e);
+        }
+    }
+
+    private void enforceDeviceAdminAfterActivation() {
+        try {
+            if (!DeviceAdminHelper.isAdminActive(this)) {
+                addBlockLog("🔒 Ative o Device Admin para impedir desativação/desinstalação");
+                DeviceAdminHelper.requestAdmin(this);
+            } else {
+                DeviceAdminHelper.applyOwnerPolicies(this);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao solicitar Device Admin", e);
         }
     }
 
